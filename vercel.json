@@ -6,20 +6,26 @@
             "use": "@vercel/static"
         }
     ],
-    "routes": [
+    "rewrites": [
         {
-            "src": "/service-worker.js",
-            "headers": {
-                "cache-control": "public, max-age=0, must-revalidate",
-                "service-worker-allowed": "/"
-            }
-        },
-        {
-            "src": "/(.*)",
-            "dest": "/$1"
+            "source": "/(.*)",
+            "destination": "/$1"
         }
     ],
     "headers": [
+        {
+            "source": "/service-worker.js",
+            "headers": [
+                {
+                    "key": "Cache-Control",
+                    "value": "public, max-age=0, must-revalidate"
+                },
+                {
+                    "key": "Service-Worker-Allowed",
+                    "value": "/"
+                }
+            ]
+        },
         {
             "source": "/manifest.json",
             "headers": [
