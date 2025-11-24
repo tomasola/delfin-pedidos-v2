@@ -334,10 +334,40 @@ Si no puedes encontrar algún campo, usa valores por defecto razonables. Respond
 
     } catch (error) {
         console.error('Error al procesar la imagen:', error);
-        showNotification('Error al procesar la imagen. Verifica tu API key.', 'error');
+        showNotification(`Error al procesar la imagen: ${error.message}`, 'error');
     } finally {
         showLoading(false);
     }
+}
+
+// Función para cargar un pedido de ejemplo
+async function loadExampleOrder() {
+    // Crear una imagen de ejemplo (1x1 pixel transparente)
+    const canvas = document.createElement('canvas');
+    canvas.width = 1;
+    canvas.height = 1;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'rgba(0,0,0,0)';
+    ctx.fillRect(0, 0, 1, 1);
+
+    canvas.toBlob(async (blob) => {
+        // Simular datos de ejemplo sin llamar a la API
+        const exampleData = {
+            clientName: 'Cliente Ejemplo S.L.',
+            clientNumber: 'CLI-12345',
+            orderNumber: 'PED-' + Date.now(),
+            date: new Date().toISOString().split('T')[0],
+            referenceNumber: 'REF-ABC-123',
+            denomination: 'Producto de Ejemplo',
+            quantityMeters: 25.5,
+            status: 'pendiente',
+            notes: 'Este es un pedido de ejemplo para probar la aplicación'
+        };
+
+        const imageUrl = URL.createObjectURL(blob);
+        currentImageData = imageUrl;
+        showOrderReviewModal(exampleData);
+    }, 'image/png');
 }
 
 function blobToBase64(blob) {
