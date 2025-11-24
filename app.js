@@ -11,48 +11,6 @@ let db = null;
 let currentStream = null;
 let currentImageData = null;
 
-// ===== INICIALIZACIÓN =====
-document.addEventListener('DOMContentLoaded', () => {
-    initializeDB();
-    initializeNavigation();
-    initializeEventListeners();
-    loadAPIKey();
-    loadOrders();
-    updateStats();
-});
-
-// ===== INDEXEDDB =====
-function initializeDB() {
-    const request = indexedDB.open(CONFIG.DB_NAME, CONFIG.DB_VERSION);
-
-    request.onerror = () => {
-        console.error('Error al abrir la base de datos');
-        showNotification('Error al inicializar la base de datos', 'error');
-    };
-
-    request.onsuccess = (event) => {
-        db = event.target.result;
-        console.log('Base de datos inicializada correctamente');
-    };
-
-    request.onupgradeneeded = (event) => {
-        db = event.target.result;
-
-        if (!db.objectStoreNames.contains(CONFIG.STORE_NAME)) {
-            const objectStore = db.createObjectStore(CONFIG.STORE_NAME, {
-                keyPath: 'id',
-                autoIncrement: true
-            });
-
-            objectStore.createIndex('orderNumber', 'orderNumber', { unique: false });
-            objectStore.createIndex('clientName', 'clientName', { unique: false });
-            objectStore.createIndex('clientNumber', 'clientNumber', { unique: false });
-            objectStore.createIndex('date', 'date', { unique: false });
-            objectStore.createIndex('status', 'status', { unique: false });
-            objectStore.createIndex('timestamp', 'timestamp', { unique: false });
-        }
-    };
-}
 
 function saveOrderToDB(orderData) {
     return new Promise((resolve, reject) => {
