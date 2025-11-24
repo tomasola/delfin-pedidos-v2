@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { getOrders, deleteOrder } from '../../services/storageService';
+import { getOrders, deleteOrder, updateOrder } from '../../services/storageService';
 import { OrderRecord } from '../../types';
-import { Search, Trash2, FileText, ChevronDown, Package } from 'lucide-react';
+import { Search, Trash2, Pencil, Check, FileText, ChevronDown, Package, Plus } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -15,6 +15,19 @@ export const HistoryOrders: React.FC = () => {
     // State for Delete
     const [deleteId, setDeleteId] = useState<string | null>(null);
     const [pin, setPin] = useState('');
+
+    // State for Edit
+    const [editOrder, setEditOrder] = useState<OrderRecord | null>(null);
+    const [showEditPinModal, setShowEditPinModal] = useState(false);
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [editFormData, setEditFormData] = useState({
+        clientName: '',
+        clientNumber: '',
+        orderNumber: '',
+        date: '',
+        notes: ''
+    });
+    const [editProducts, setEditProducts] = useState<any[]>([]);
 
     // State for Detail View
     const [selectedOrder, setSelectedOrder] = useState<OrderRecord | null>(null);
@@ -51,9 +64,67 @@ export const HistoryOrders: React.FC = () => {
             const updated = await deleteOrder(deleteId);
             setOrders(updated);
             setDeleteId(null);
+            setPin('');
         } else {
             alert("PIN Incorrecto");
         }
+    };
+
+    // Edit Handlers
+    const handleEditRequest = (order: OrderRecord) => {
+        setEditOrder(order);
+        setEditFormData({
+            clientName: order.clientName,
+            clientNumber: order.clientNumber || '',
+            orderNumber: order.orderNumber,
+            date: order.date,
+            notes: order.notes || ''
+        });
+        setEditProducts(order.products || []);
+        setPin('');
+        setShowEditPinModal(true);
+    };
+
+    const confirmEditPin = () => {
+        if (pin === '1234') {
+            setShowEditPinModal(false);
+            setShowEditModal(true);
+        } else {
+            alert("PIN Incorrecto");
+        }
+    };
+
+    const saveEditedOrder = async () => {
+        if (editOrder) {
+            const updatedOrder = {
+                ...editOrder,
+                ...editFormData,
+                products: editProducts
+            };
+            await updateOrder(updatedOrder);
+            await loadOrders();
+            setShowEditModal(false);
+            setEditOrder(null);
+        }
+    };
+
+    const updateProduct = (index: number, field: string, value: any) => {
+        const updated = [...editProducts];
+        updated[index] = { ...updated[index], [field]: value };
+        setEditProducts(updated);
+    };
+
+    const deleteProduct = (index: number) => {
+        setEditProducts(editProducts.filter((_, i) => i !== index));
+    };
+
+    const addProduct = () => {
+        setEditProducts([...editProducts, {
+            reference: '',
+            denomination: '',
+            totalMeters: 0,
+            metersPerUnit: 0
+        }]);
     };
 
     return (
@@ -116,12 +187,20 @@ export const HistoryOrders: React.FC = () => {
                                         <p className="text-slate-400 text-xs">Cliente #{order.clientNumber}</p>
                                     )}
                                 </div>
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); handleDeleteRequest(order.id); }}
-                                    className="p-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
-                                >
-                                    <Trash2 size={16} />
-                                </button>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handleEditRequest(order); }}
+                                        className="p-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                                    >
+                                        <Pencil size={16} />
+                                    </button>
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handleDeleteRequest(order.id); }}
+                                        className="p-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-2 text-sm">
@@ -249,6 +328,128 @@ export const HistoryOrders: React.FC = () => {
                         <Button onClick={() => setSelectedOrder(null)} variant="secondary" className="w-full">
                             Cerrar
                         </Button>
+                    </div>
+                </Modal>
+            )}
+
+            {/* Edit PIN Modal */}
+            {showEditPinModal && (
+                <Modal isOpen={true} onClose={() => setShowEditPinModal(false)} title="Verificación">
+                    <div className="space-y-4">
+                        <p className="text-slate-300">Ingresa el PIN para editar este pedido:</p>
+                        <Input
+                            type="password"
+                            placeholder="PIN"
+                            value={pin}
+                            onChange={(e) => setPin(e.target.value)}
+                            maxLength={4}
+                        />
+                        <div className="flex gap-2">
+                            <Button onClick={confirmEditPin} variant="primary" className="flex-1">
+                                <Check size={18} className="mr-2" />
+                                Continuar
+                            </Button>
+                            <Button onClick={() => setShowEditPinModal(false)} variant="secondary" className="flex-1">
+                                Cancelar
+                            </Button>
+                        </div>
+                    </div>
+                </Modal>
+            )}
+
+            {/* Edit Form Modal */}
+            {showEditModal && (
+                <Modal isOpen={true} onClose={() => setShowEditModal(false)} title="Editar Pedido">
+                    <div className="space-y-4 max-h-[70vh] overflow-y-auto">
+                        <Input
+                            label="Cliente"
+                            value={editFormData.clientName}
+                            onChange={(e) => setEditFormData({ ...editFormData, clientName: e.target.value })}
+                        />
+                        <Input
+                            label="Número de Cliente"
+                            value={editFormData.clientNumber}
+                            onChange={(e) => setEditFormData({ ...editFormData, clientNumber: e.target.value })}
+                        />
+                        <Input
+                            label="Número de Pedido"
+                            value={editFormData.orderNumber}
+                            onChange={(e) => setEditFormData({ ...editFormData, orderNumber: e.target.value })}
+                        />
+                        <Input
+                            label="Fecha"
+                            type="date"
+                            value={editFormData.date}
+                            onChange={(e) => setEditFormData({ ...editFormData, date: e.target.value })}
+                        />
+                        <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-2">Notas</label>
+                            <textarea
+                                className="w-full bg-slate-900 text-white px-4 py-3 rounded-lg border border-slate-700 focus:ring-2 focus:ring-amber-500 outline-none"
+                                rows={2}
+                                value={editFormData.notes}
+                                onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
+                            />
+                        </div>
+
+                        {/* Products Section */}
+                        <div className="border-t border-slate-700 pt-4">
+                            <div className="flex justify-between items-center mb-3">
+                                <h4 className="text-white font-semibold">Productos ({editProducts.length})</h4>
+                                <Button onClick={addProduct} variant="primary" className="text-sm">
+                                    <Plus size={16} className="mr-1" />
+                                    Agregar
+                                </Button>
+                            </div>
+                            {editProducts.map((product, index) => (
+                                <div key={index} className="bg-slate-800 rounded-lg p-3 mb-2 border border-slate-700">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <span className="text-amber-500 font-semibold text-sm">Producto {index + 1}</span>
+                                        <button
+                                            onClick={() => deleteProduct(index)}
+                                            className="text-red-500 hover:text-red-400"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <Input
+                                            label="Referencia"
+                                            value={product.reference}
+                                            onChange={(e) => updateProduct(index, 'reference', e.target.value)}
+                                        />
+                                        <Input
+                                            label="Metros Totales"
+                                            type="number"
+                                            value={product.totalMeters.toString()}
+                                            onChange={(e) => updateProduct(index, 'totalMeters', parseFloat(e.target.value) || 0)}
+                                        />
+                                        <Input
+                                            label="Denominación"
+                                            value={product.denomination}
+                                            onChange={(e) => updateProduct(index, 'denomination', e.target.value)}
+                                            className="col-span-2"
+                                        />
+                                        <Input
+                                            label="Metros/Unidad"
+                                            type="number"
+                                            value={product.metersPerUnit?.toString() || ''}
+                                            onChange={(e) => updateProduct(index, 'metersPerUnit', parseFloat(e.target.value) || 0)}
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="flex gap-2 pt-2">
+                            <Button onClick={saveEditedOrder} variant="primary" className="flex-1">
+                                <Check size={18} className="mr-2" />
+                                Guardar
+                            </Button>
+                            <Button onClick={() => setShowEditModal(false)} variant="secondary" className="flex-1">
+                                Cancelar
+                            </Button>
+                        </div>
                     </div>
                 </Modal>
             )}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Scan, FileText } from 'lucide-react';
+import { Scan, FileText, Settings } from 'lucide-react';
 
 const Home: React.FC = () => {
     const navigate = useNavigate();
@@ -21,7 +21,7 @@ const Home: React.FC = () => {
                         <Scan size={32} />
                     </div>
                     <div className="text-left">
-                        <h2 className="text-xl font-bold text-white group-hover:text-amber-500 transition-colors">Delfín 14</h2>
+                        <h2 className="text-xl font-bold text-white group-hover:text-amber-500 transition-colors">Etiquetas</h2>
                         <p className="text-sm text-slate-400">Escáner de Perfiles</p>
                     </div>
                 </button>
@@ -36,6 +36,19 @@ const Home: React.FC = () => {
                     <div className="text-left">
                         <h2 className="text-xl font-bold text-white group-hover:text-blue-500 transition-colors">Análisis Pedidos</h2>
                         <p className="text-sm text-slate-400">Gestión de Pedidos</p>
+                    </div>
+                </button>
+
+                <button
+                    onClick={() => navigate('/admin')}
+                    className="flex items-center p-6 bg-slate-800 rounded-xl border border-slate-700 hover:border-green-500 hover:bg-slate-750 transition-all group"
+                >
+                    <div className="p-4 bg-slate-700 rounded-full mr-4 group-hover:bg-green-500/20 group-hover:text-green-500 transition-colors">
+                        <Settings size={32} />
+                    </div>
+                    <div className="text-left">
+                        <h2 className="text-xl font-bold text-white group-hover:text-green-500 transition-colors">Administración</h2>
+                        <p className="text-sm text-slate-400">Gestión de Datos</p>
                     </div>
                 </button>
             </div>

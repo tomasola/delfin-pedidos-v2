@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { Scanner } from './components/Scanner/Scanner';
 import { History } from './components/History/History';
 import { Dashboard } from './components/Dashboard/Dashboard';
-import { Admin } from './components/Admin/Admin';
-import { Scan, List, PieChart, Settings } from 'lucide-react';
+import { Scan, List, PieChart } from 'lucide-react';
 import { AppTab } from './types';
 
 import { useNavigate } from 'react-router-dom';
@@ -18,7 +17,6 @@ const App: React.FC = () => {
       case 'scan': return <Scanner />;
       case 'history': return <History />;
       case 'data': return <Dashboard />;
-      case 'admin': return <Admin />;
       default: return <Scanner />;
     }
   };
@@ -58,12 +56,6 @@ const App: React.FC = () => {
           onClick={() => setActiveTab('data')}
           icon={<PieChart size={22} />}
           label="Datos"
-        />
-        <NavButton
-          active={activeTab === 'admin'}
-          onClick={() => setActiveTab('admin')}
-          icon={<Settings size={22} />}
-          label="Admin"
         />
       </nav>
     </div>
