@@ -1,7 +1,8 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
-import { getRecords, deleteRecord, updateRecord } from '../../services/storageService';
-import { ScanRecord } from '../../types';
+import { getRecords, deleteRecord, updateRecord } from '../../services/localStorageService';
+import { Record as ScanRecord } from '../../types';
 import { Search, Trash2, Pencil, Check, Package, Camera, X } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
@@ -47,7 +48,9 @@ export const History: React.FC = () => {
 
   const confirmDelete = async () => {
     if (pin === '1234' && deleteId) {
-      const updated = await deleteRecord(deleteId);
+      await deleteRecord(deleteId);
+      // Recargar datos después de eliminar
+      const updated = await getRecords();
       setRecords(updated);
       setDeleteId(null);
     } else {

@@ -13,7 +13,7 @@ export interface ExtractedData {
   boundingBox?: BoundingBox;
 }
 
-export interface ScanRecord {
+export interface Record {
   id: string;
   reference: string;
   length: string;

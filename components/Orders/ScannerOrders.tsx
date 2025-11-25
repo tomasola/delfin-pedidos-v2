@@ -5,7 +5,7 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { analyzeOrderImage } from '../../services/geminiServiceOrders';
 import { compressImage } from '../../services/imageService';
-import { saveOrder, getOrders } from '../../services/storageService';
+import { saveOrder, getOrders } from '../../services/localStorageService';
 import { v4 as uuidv4 } from 'uuid';
 import { ProductLine } from '../../types';
 
@@ -106,7 +106,7 @@ export const ScannerOrders: React.FC = () => {
             alert(`❌ PEDIDO REPETIDO\\n\\nEl pedido \"${formData.orderNumber}\" ya existe.\\n\\nNo se puede guardar un pedido duplicado.`);
             return;
         }
-        
+
 
         const newRecord = {
             id: uuidv4(),

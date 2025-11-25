@@ -1,10 +1,10 @@
 import { openDB, DBSchema } from 'idb';
-import { ScanRecord, OrderRecord } from '../types';
+import { Record, OrderRecord } from '../types';
 
 interface ScannerDB extends DBSchema {
     records: {
         key: string;
-        value: ScanRecord;
+        value: Record;
         indexes: { 'by-date': number };
     };
     orders: {

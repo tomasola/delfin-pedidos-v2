@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getOrders, deleteOrder, updateOrder } from '../../services/storageService';
+import { getOrders, deleteOrder, updateOrder } from '../../services/localStorageService';
 import { OrderRecord } from '../../types';
 import { Search, Trash2, Pencil, Check, FileText, ChevronDown, Package, Plus } from 'lucide-react';
 import { Modal } from '../ui/Modal';
@@ -61,7 +61,9 @@ export const HistoryOrders: React.FC = () => {
 
     const confirmDelete = async () => {
         if (pin === '1234' && deleteId) {
-            const updated = await deleteOrder(deleteId);
+            await deleteOrder(deleteId);
+            // Recargar datos después de eliminar
+            const updated = await getOrders();
             setOrders(updated);
             setDeleteId(null);
             setPin('');
@@ -96,12 +98,11 @@ export const HistoryOrders: React.FC = () => {
 
     const saveEditedOrder = async () => {
         if (editOrder) {
-            const updatedOrder = {
-                ...editOrder,
+            const updatedData = {
                 ...editFormData,
                 products: editProducts
             };
-            await updateOrder(updatedOrder);
+            await updateOrder(editOrder.id, updatedData);
             await loadOrders();
             setShowEditModal(false);
             setEditOrder(null);

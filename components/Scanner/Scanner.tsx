@@ -5,9 +5,8 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { analyzeImage } from '../../services/geminiService';
 import { compressImage } from '../../services/imageService';
-import { saveRecord, getRecords } from '../../services/storageService';
+import { saveRecord, getRecords } from '../../services/localStorageService';
 import { generatePDF } from '../../services/pdfService';
-import { v4 as uuidv4 } from 'uuid';
 import { CropEditor } from './CropEditor';
 import { BoundingBox } from '../../types';
 
@@ -20,6 +19,7 @@ export const Scanner: React.FC = () => {
   const [formData, setFormData] = useState({ reference: '', length: '', quantity: '' });
   const [aiBoundingBox, setAiBoundingBox] = useState<BoundingBox | undefined>(undefined);
   const [isDuplicate, setIsDuplicate] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Efecto para verificar duplicados en tiempo real cuando cambia la referencia o entramos en modo revisión
   useEffect(() => {
@@ -49,13 +49,15 @@ export const Scanner: React.FC = () => {
   };
 
   const capture = useCallback(async () => {
-    const imageSrc = webcamRef.current?.getScreenshot();
-    if (imageSrc) {
-      const compressed = await compressImage(imageSrc);
-      setOriginalImage(compressed);
-      processImage(compressed);
+    if (webcamRef.current) {
+      const imageSrc = webcamRef.current.getScreenshot();
+      if (imageSrc) {
+        const compressed = await compressImage(imageSrc);
+        setOriginalImage(compressed);
+        processImage(compressed);
+      }
     }
-  }, [webcamRef]);
+  }, []);
 
   const processImage = async (base64: string) => {
     setStatus('analyzing');
@@ -134,7 +136,45 @@ export const Scanner: React.FC = () => {
     });
   };
 
+  const handleCrop = (croppedBase64: string) => {
+    setCroppedImage(croppedBase64);
+    setStatus('review');
+  };
+
+  const handleRetake = () => {
+    setStatus('idle');
+    setOriginalImage('');
+    setCroppedImage('');
+    setFormData({ reference: '', length: '', quantity: '' });
+    setAiBoundingBox(undefined);
+  };
+
+  const handleReanalyze = () => {
+    if (originalImage) {
+      processImage(originalImage);
+    }
+  };
+
+  const handleCropMode = () => {
+    setStatus('cropping');
+  };
+
+  const preloadImage = (base64: string): Promise<void> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        resolve();
+      };
+      img.src = base64;
+    });
+  };
+
   const handleSave = async () => {
+    // Prevenir doble guardado
+    if (isSaving) {
+      return;
+    }
+
     if (!formData.reference) {
       alert("Por favor ingrese una Referencia.");
       return;
@@ -146,23 +186,34 @@ export const Scanner: React.FC = () => {
       return;
     }
 
+    // Activar estado de guardando
+    setIsSaving(true);
+
+    // NO incluir 'id' al crear el registro - Firebase lo genera automáticamente
     const newRecord = {
-      id: uuidv4(),
       ...formData,
       originalImage,
       croppedImage,
       timestamp: Date.now()
     };
 
-    await saveRecord(newRecord);
-    generatePDF(newRecord);
+    try {
+      const recordId = await saveRecord(newRecord);
+      // PDF necesita un id, usamos el generado por Firebase
+      generatePDF({ id: recordId, ...newRecord });
 
-    // Reset
-    setStatus('idle');
-    setOriginalImage('');
-    setCroppedImage('');
-    setFormData({ reference: '', length: '', quantity: '' });
-    alert("✅ Registro guardado correctamente.");
+      // Reset
+      setStatus('idle');
+      setOriginalImage('');
+      setCroppedImage('');
+      setFormData({ reference: '', length: '', quantity: '' });
+      setIsSaving(false);
+      alert("✅ Registro guardado correctamente.");
+    } catch (error) {
+      console.error('Error al guardar:', error);
+      setIsSaving(false);
+      alert("❌ Error al guardar el registro. Por favor, intenta de nuevo.");
+    }
   };
 
   const loadExample = async () => {
@@ -330,8 +381,17 @@ export const Scanner: React.FC = () => {
             className="flex-[2]"
             onClick={handleSave}
             variant={isDuplicate ? 'secondary' : 'primary'}
+            disabled={isSaving || isDuplicate}
           >
-            <Save className="mr-2" size={18} /> Guardar
+            {isSaving ? (
+              <>
+                <Loader2 className="mr-2 animate-spin" size={18} /> Guardando...
+              </>
+            ) : (
+              <>
+                <Save className="mr-2" size={18} /> Guardar
+              </>
+            )}
           </Button>
         </div>
       </div>
