@@ -140,11 +140,10 @@ export const Scanner: React.FC = () => {
       return;
     }
 
-    // Verificar duplicados y pedir confirmación
+    // Bloquear duplicados completamente
     if (isDuplicate) {
-      if (!confirm(`⛔ DUPLICADO DETECTADO\n\nLa referencia "${formData.reference}" ya existe en el historial.\n\n¿Desea guardarlo de todos modos?`)) {
-        return;
-      }
+      alert(`❌ ETIQUETA REPETIDA\n\nLa referencia "${formData.reference}" ya existe en el historial.\n\nNo se puede guardar una referencia duplicada.`);
+      return;
     }
 
     const newRecord = {
