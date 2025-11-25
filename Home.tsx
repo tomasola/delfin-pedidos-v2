@@ -1,3 +1,4 @@
+// Force rebuild - v2.1
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Scan, FileText, Settings } from 'lucide-react';
