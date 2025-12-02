@@ -192,16 +192,48 @@ export const Admin: React.FC = () => {
       if (localData.records && Array.isArray(localData.records)) {
         for (const record of localData.records) {
           try {
-            // Excluir imágenes grandes para evitar límite de 1MB de Firestore
-            const { id, originalImage, croppedImage, packingPhoto, ...recordData } = record;
+            // Preparar datos para subir
+            const recordData = { ...record };
+            delete recordData.id; // No subir ID como campo
+
+            // Subir imágenes a Storage si existen y son base64 (no URLs)
+            if (record.originalImage && record.originalImage.startsWith('data:')) {
+              try {
+                const url = await firebaseStorageService.uploadImage(record.originalImage, `images/${record.id}/original.jpg`);
+                recordData.originalImage = url;
+              } catch (e) {
+                console.error("Error subiendo imagen original:", e);
+                delete recordData.originalImage; // Si falla, no guardar base64 gigante
+              }
+            }
+
+            if (record.croppedImage && record.croppedImage.startsWith('data:')) {
+              try {
+                const url = await firebaseStorageService.uploadImage(record.croppedImage, `images/${record.id}/cropped.jpg`);
+                recordData.croppedImage = url;
+              } catch (e) {
+                console.error("Error subiendo imagen recortada:", e);
+                delete recordData.croppedImage;
+              }
+            }
+
+            if (record.packingPhoto && record.packingPhoto.startsWith('data:')) {
+              try {
+                const url = await firebaseStorageService.uploadImage(record.packingPhoto, `images/${record.id}/packing.jpg`);
+                recordData.packingPhoto = url;
+              } catch (e) {
+                console.error("Error subiendo foto packing:", e);
+                delete recordData.packingPhoto;
+              }
+            }
 
             await Promise.race([
               firebaseStorageService.saveRecord(recordData),
-              new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 30000))
+              new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 60000)) // Aumentado timeout para imágenes
             ]);
 
             recordsUploaded++;
-            console.log(`✅ Etiqueta subida: ${id}`);
+            console.log(`✅ Etiqueta subida: ${record.id}`);
             await new Promise(resolve => setTimeout(resolve, 100));
           } catch (error: any) {
             // Si el error es por duplicado, no es realmente un error

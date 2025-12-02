@@ -1,4 +1,5 @@
-import { db, auth, ensureSignedIn } from '../src/config/firebase';
+import { db, auth, storage, ensureSignedIn } from '../src/config/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import {
     collection,
     addDoc,
@@ -103,4 +104,29 @@ export const exportData = async () => {
         orders,
         exportDate: new Date().toISOString()
     };
+};
+
+// ============ STORAGE ============
+
+export const uploadImage = async (base64String: string, path: string): Promise<string> => {
+    try {
+        await ensureSignedIn();
+
+        // Convert base64 to blob
+        const response = await fetch(base64String);
+        const blob = await response.blob();
+
+        // Create reference
+        const storageRef = ref(storage, path);
+
+        // Upload
+        await uploadBytes(storageRef, blob);
+
+        // Get URL
+        const url = await getDownloadURL(storageRef);
+        return url;
+    } catch (error) {
+        console.error("Error uploading image:", error);
+        throw error;
+    }
 };
