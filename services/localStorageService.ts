@@ -202,3 +202,93 @@ export const getFirebaseDeletePin = (): string => {
 export const setFirebaseDeletePin = (pin: string): void => {
     localStorage.setItem('delfin_firebase_pin', pin);
 };
+
+// ============ DEDUPLICATION ============
+
+export const removeDuplicateRecords = async (): Promise<{ removed: number; kept: number }> => {
+    try {
+        const db = await initDB();
+        const allRecords = await db.getAllFromIndex('records', 'by-date');
+
+        // Group by reference (assuming records with same reference are duplicates)
+        const recordMap = new Map<string, Record[]>();
+
+        for (const record of allRecords) {
+            const key = record.reference || 'unknown';
+            if (!recordMap.has(key)) {
+                recordMap.set(key, []);
+            }
+            recordMap.get(key)!.push(record);
+        }
+
+        let removed = 0;
+        let kept = 0;
+
+        // For each group, keep only the most recent one
+        for (const [reference, records] of recordMap.entries()) {
+            if (records.length > 1) {
+                // Sort by timestamp descending (most recent first)
+                records.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+                // Keep the first (most recent), delete the rest
+                for (let i = 1; i < records.length; i++) {
+                    await db.delete('records', records[i].id);
+                    removed++;
+                    console.log(`🗑️ Eliminado duplicado: ${records[i].reference} (${records[i].id})`);
+                }
+                kept++;
+            } else {
+                kept++;
+            }
+        }
+
+        return { removed, kept };
+    } catch (e) {
+        console.error("Error removing duplicate records", e);
+        throw e;
+    }
+};
+
+export const removeDuplicateOrders = async (): Promise<{ removed: number; kept: number }> => {
+    try {
+        const db = await initDB();
+        const allOrders = await db.getAllFromIndex('orders', 'by-date');
+
+        // Group by orderNumber (assuming orders with same number are duplicates)
+        const orderMap = new Map<string, OrderRecord[]>();
+
+        for (const order of allOrders) {
+            const key = order.orderNumber || 'unknown';
+            if (!orderMap.has(key)) {
+                orderMap.set(key, []);
+            }
+            orderMap.get(key)!.push(order);
+        }
+
+        let removed = 0;
+        let kept = 0;
+
+        // For each group, keep only the most recent one
+        for (const [orderNumber, orders] of orderMap.entries()) {
+            if (orders.length > 1) {
+                // Sort by timestamp descending (most recent first)
+                orders.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+                // Keep the first (most recent), delete the rest
+                for (let i = 1; i < orders.length; i++) {
+                    await db.delete('orders', orders[i].id);
+                    removed++;
+                    console.log(`🗑️ Eliminado pedido duplicado: ${orders[i].orderNumber} (${orders[i].id})`);
+                }
+                kept++;
+            } else {
+                kept++;
+            }
+        }
+
+        return { removed, kept };
+    } catch (e) {
+        console.error("Error removing duplicate orders", e);
+        throw e;
+    }
+};

@@ -314,6 +314,36 @@ export const Admin: React.FC = () => {
     }
   };
 
+  const handleRemoveDuplicates = async () => {
+    try {
+      console.log("🔍 Buscando duplicados...");
+
+      const recordsResult = await localStorageService.removeDuplicateRecords();
+      const ordersResult = await localStorageService.removeDuplicateOrders();
+
+      const totalRemoved = recordsResult.removed + ordersResult.removed;
+      const totalKept = recordsResult.kept + ordersResult.kept;
+
+      if (totalRemoved > 0) {
+        alert(
+          `✅ LIMPIEZA COMPLETADA\n\n` +
+          `🗑️ Duplicados eliminados:\n` +
+          `• Etiquetas: ${recordsResult.removed}\n` +
+          `• Pedidos: ${ordersResult.removed}\n\n` +
+          `✅ Registros únicos conservados:\n` +
+          `• Etiquetas: ${recordsResult.kept}\n` +
+          `• Pedidos: ${ordersResult.kept}\n\n` +
+          `Se conservó la versión más reciente de cada duplicado.`
+        );
+      } else {
+        alert("✅ No se encontraron duplicados.\n\nTu base de datos está limpia.");
+      }
+    } catch (error) {
+      console.error("Error al eliminar duplicados:", error);
+      alert("❌ Error al eliminar duplicados. Revisa la consola.");
+    }
+  };
+
   if (!isUnlocked) {
     return (
       <div className="h-full flex flex-col items-center justify-center p-6 gap-6 bg-slate-900">
@@ -354,6 +384,10 @@ export const Admin: React.FC = () => {
           <Upload className="mr-3 text-blue-400" /> Importar a Base de Datos Local
         </Button>
         <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleImportLocal} />
+
+        <Button fullWidth variant="secondary" onClick={handleRemoveDuplicates} className="justify-start bg-purple-900/30 hover:bg-purple-900/50 border border-purple-700/50">
+          <Trash2 className="mr-3 text-purple-400" /> Eliminar Duplicados
+        </Button>
       </section>
 
       {/* Firebase Sync */}
