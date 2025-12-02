@@ -232,7 +232,7 @@ export const Admin: React.FC = () => {
             }
 
             await Promise.race([
-              firebaseStorageService.saveRecord(recordData),
+              firebaseStorageService.saveRecord(recordData, record.id), // Pasar el ID para evitar duplicados
               new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 60000)) // Aumentado timeout para imágenes
             ]);
 
@@ -259,7 +259,7 @@ export const Admin: React.FC = () => {
             const { id, originalImage, croppedImage, ...orderData } = order;
 
             await Promise.race([
-              firebaseStorageService.saveOrder(orderData),
+              firebaseStorageService.saveOrder(orderData, order.id), // Pasar el ID para evitar duplicados
               new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 30000))
             ]);
 

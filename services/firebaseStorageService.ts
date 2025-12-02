@@ -7,6 +7,7 @@ import {
     updateDoc,
     deleteDoc,
     doc,
+    setDoc,
     query,
     orderBy
 } from 'firebase/firestore';
@@ -14,18 +15,29 @@ import { Record, OrderRecord } from '../types';
 
 // ============ ETIQUETAS ============
 
-export const saveRecord = async (record: Partial<Omit<Record, 'id'>>): Promise<string> => {
+export const saveRecord = async (record: Partial<Omit<Record, 'id'>>, recordId?: string): Promise<string> => {
     // Ensure user is signed in before attempting to save
     await ensureSignedIn();
 
     // Si no hay usuario autenticado, usamos un email genérico de admin
     const createdBy = auth.currentUser?.email ?? 'admin@local';
-    const docRef = await addDoc(collection(db, 'records'), {
+
+    const dataToSave = {
         ...record,
-        timestamp: Date.now(),
+        timestamp: record.timestamp || Date.now(),
         createdBy,
-    });
-    return docRef.id;
+    };
+
+    if (recordId) {
+        // Si tenemos un ID, usar setDoc para actualizar/crear con ese ID específico
+        const docRef = doc(db, 'records', recordId);
+        await setDoc(docRef, dataToSave, { merge: true });
+        return recordId;
+    } else {
+        // Si no hay ID, crear uno nuevo
+        const docRef = await addDoc(collection(db, 'records'), dataToSave);
+        return docRef.id;
+    }
 };
 
 export const getRecords = async (): Promise<Record[]> => {
@@ -49,18 +61,29 @@ export const updateRecord = async (record: Record): Promise<void> => {
 
 // ============ PEDIDOS ============
 
-export const saveOrder = async (order: Partial<Omit<OrderRecord, 'id'>>): Promise<string> => {
+export const saveOrder = async (order: Partial<Omit<OrderRecord, 'id'>>, orderId?: string): Promise<string> => {
     // Ensure user is signed in before attempting to save
     await ensureSignedIn();
 
     // Si no hay usuario autenticado, usamos un email genérico de admin
     const createdBy = auth.currentUser?.email ?? 'admin@local';
-    const docRef = await addDoc(collection(db, 'orders'), {
+
+    const dataToSave = {
         ...order,
-        timestamp: Date.now(),
+        timestamp: order.timestamp || Date.now(),
         createdBy,
-    });
-    return docRef.id;
+    };
+
+    if (orderId) {
+        // Si tenemos un ID, usar setDoc para actualizar/crear con ese ID específico
+        const docRef = doc(db, 'orders', orderId);
+        await setDoc(docRef, dataToSave, { merge: true });
+        return orderId;
+    } else {
+        // Si no hay ID, crear uno nuevo
+        const docRef = await addDoc(collection(db, 'orders'), dataToSave);
+        return docRef.id;
+    }
 };
 
 export const getOrders = async (): Promise<OrderRecord[]> => {
