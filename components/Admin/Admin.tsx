@@ -192,9 +192,9 @@ export const Admin: React.FC = () => {
       if (localData.records && Array.isArray(localData.records)) {
         for (const record of localData.records) {
           try {
-            // Preparar datos para subir
-            const recordData = { ...record };
-            delete recordData.id; // No subir ID como campo
+            // Preparar datos base (sin id)
+            const { id, ...baseData } = record;
+            let recordData: any = { ...baseData };
 
             // Subir imágenes a Storage si existen y son base64 (no URLs)
             if (record.originalImage && record.originalImage.startsWith('data:')) {
@@ -203,7 +203,9 @@ export const Admin: React.FC = () => {
                 recordData.originalImage = url;
               } catch (e) {
                 console.error("Error subiendo imagen original:", e);
-                delete recordData.originalImage; // Si falla, no guardar base64 gigante
+                // Si falla, excluir la imagen del objeto
+                const { originalImage, ...rest } = recordData;
+                recordData = rest;
               }
             }
 
@@ -213,7 +215,8 @@ export const Admin: React.FC = () => {
                 recordData.croppedImage = url;
               } catch (e) {
                 console.error("Error subiendo imagen recortada:", e);
-                delete recordData.croppedImage;
+                const { croppedImage, ...rest } = recordData;
+                recordData = rest;
               }
             }
 
@@ -223,7 +226,8 @@ export const Admin: React.FC = () => {
                 recordData.packingPhoto = url;
               } catch (e) {
                 console.error("Error subiendo foto packing:", e);
-                delete recordData.packingPhoto;
+                const { packingPhoto, ...rest } = recordData;
+                recordData = rest;
               }
             }
 
