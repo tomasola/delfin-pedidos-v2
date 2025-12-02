@@ -185,3 +185,20 @@ export const importData = async (jsonData: any): Promise<void> => {
         throw new Error("Error importando datos");
     }
 };
+// ============ SECURITY ============
+
+export const getAdminPin = (): string => {
+    return localStorage.getItem('delfin_admin_pin') || '1234';
+};
+
+export const setAdminPin = (pin: string): void => {
+    localStorage.setItem('delfin_admin_pin', pin);
+};
+
+export const getFirebaseDeletePin = (): string => {
+    return localStorage.getItem('delfin_firebase_pin') || '123456';
+};
+
+export const setFirebaseDeletePin = (pin: string): void => {
+    localStorage.setItem('delfin_firebase_pin', pin);
+};

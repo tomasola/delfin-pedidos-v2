@@ -14,13 +14,64 @@ export const Admin: React.FC = () => {
   const [syncProgress, setSyncProgress] = useState({ current: 0, total: 0, type: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Security State
+  const [newAdminPin, setNewAdminPin] = useState('');
+  const [currentAdminPinInput, setCurrentAdminPinInput] = useState('');
+  const [newFirebasePin, setNewFirebasePin] = useState('');
+  const [currentFirebasePinInput, setCurrentFirebasePinInput] = useState('');
+  const [deletePinInput, setDeletePinInput] = useState('');
+  const [showFirebasePinModal, setShowFirebasePinModal] = useState(false);
+
+  const MASTER_KEY = '10061978';
+
   const handleLogin = () => {
-    if (pin === '1234') {
+    const currentPin = localStorageService.getAdminPin();
+    if (pin === currentPin || pin === MASTER_KEY) {
       setIsUnlocked(true);
       setPin('');
     } else {
       alert("PIN Incorrecto");
     }
+  };
+
+  // ... (Export/Import/Sync functions remain unchanged) ...
+
+  const handleUpdateAdminPin = () => {
+    const currentPin = localStorageService.getAdminPin();
+
+    if (currentAdminPinInput !== currentPin && currentAdminPinInput !== MASTER_KEY) {
+      alert("❌ El PIN actual es incorrecto");
+      return;
+    }
+
+    if (newAdminPin.length < 4) {
+      alert("El nuevo PIN debe tener al menos 4 caracteres");
+      return;
+    }
+
+    localStorageService.setAdminPin(newAdminPin);
+    setNewAdminPin('');
+    setCurrentAdminPinInput('');
+    alert("✅ PIN de Administrador actualizado correctamente");
+  };
+
+  const handleUpdateFirebasePin = () => {
+    const currentPin = localStorageService.getFirebaseDeletePin();
+
+    if (currentFirebasePinInput !== currentPin && currentFirebasePinInput !== MASTER_KEY) {
+      alert("❌ El PIN actual es incorrecto");
+      return;
+    }
+
+    if (newFirebasePin.length < 4) {
+      alert("El nuevo PIN debe tener al menos 4 caracteres");
+      return;
+    }
+
+    localStorageService.setFirebaseDeletePin(newFirebasePin);
+    setNewFirebasePin('');
+    setCurrentFirebasePinInput('');
+    alert("✅ PIN de Borrado de Firebase actualizado correctamente");
   };
 
   // Exportar base de datos LOCAL
@@ -239,6 +290,30 @@ export const Admin: React.FC = () => {
     alert("Base de datos local vaciada.");
   };
 
+  const [showFirebaseResetModal, setShowFirebaseResetModal] = useState(false);
+
+  const handleVerifyFirebasePin = () => {
+    const correctPin = localStorageService.getFirebaseDeletePin();
+    if (deletePinInput === correctPin) {
+      setShowFirebasePinModal(false);
+      setDeletePinInput('');
+      setShowFirebaseResetModal(true); // Show confirmation modal
+    } else {
+      alert("❌ PIN Incorrecto");
+    }
+  };
+
+  const handleClearFirebase = async () => {
+    try {
+      await firebaseStorageService.clearAllData();
+      setShowFirebaseResetModal(false);
+      alert("✅ Base de datos de Firebase vaciada correctamente.");
+    } catch (error) {
+      console.error("Error al borrar datos de Firebase:", error);
+      alert("❌ Error al borrar datos de Firebase. Revisa la consola.");
+    }
+  };
+
   if (!isUnlocked) {
     return (
       <div className="h-full flex flex-col items-center justify-center p-6 gap-6 bg-slate-900">
@@ -329,12 +404,61 @@ export const Admin: React.FC = () => {
         )}
       </section>
 
+      {/* Security Section */}
+      <section className="space-y-4">
+        <h3 className="text-slate-400 text-sm font-bold uppercase tracking-wider border-b border-slate-800 pb-2">Configuración de Seguridad</h3>
+
+        <div className="space-y-2">
+          <label className="text-xs text-slate-400">Cambiar PIN de Administrador</label>
+          <Input
+            type="password"
+            placeholder="PIN Actual o Maestro (10061978)"
+            value={currentAdminPinInput}
+            onChange={e => setCurrentAdminPinInput(e.target.value)}
+            className="mb-2"
+          />
+          <div className="flex gap-2">
+            <Input
+              type="text"
+              placeholder="Nuevo PIN Admin (min 4)"
+              value={newAdminPin}
+              onChange={e => setNewAdminPin(e.target.value)}
+            />
+            <Button onClick={handleUpdateAdminPin} variant="secondary">Guardar</Button>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs text-slate-400">Cambiar PIN Borrado Firebase</label>
+          <Input
+            type="password"
+            placeholder="PIN Actual o Maestro (10061978)"
+            value={currentFirebasePinInput}
+            onChange={e => setCurrentFirebasePinInput(e.target.value)}
+            className="mb-2"
+          />
+          <div className="flex gap-2">
+            <Input
+              type="text"
+              placeholder="Nuevo PIN Firebase (min 4)"
+              value={newFirebasePin}
+              onChange={e => setNewFirebasePin(e.target.value)}
+            />
+            <Button onClick={handleUpdateFirebasePin} variant="secondary">Guardar</Button>
+          </div>
+        </div>
+      </section>
+
       {/* Danger Zone */}
       <section className="space-y-4">
         <h3 className="text-slate-400 text-sm font-bold uppercase tracking-wider border-b border-slate-800 pb-2">Zona de Peligro</h3>
 
         <Button fullWidth variant="danger" onClick={() => setShowResetModal(true)} className="justify-start bg-red-900/50 hover:bg-red-900 text-red-200 border border-red-800">
-          <Trash2 className="mr-3" /> Borrar Todo
+          <Trash2 className="mr-3" /> Borrar Datos Locales
+        </Button>
+
+        <Button fullWidth variant="danger" onClick={() => setShowFirebasePinModal(true)} className="justify-start bg-red-900/50 hover:bg-red-900 text-red-200 border border-red-800">
+          <Cloud className="mr-3" /> Borrar Datos de Firebase
         </Button>
       </section>
 
@@ -346,12 +470,40 @@ export const Admin: React.FC = () => {
         </div>
       </section>
 
-      <Modal isOpen={showResetModal} onClose={() => setShowResetModal(false)} title="¿Borrar Base de Datos?">
+      <Modal isOpen={showResetModal} onClose={() => setShowResetModal(false)} title="¿Borrar Base de Datos Local?">
         <div className="space-y-4">
-          <p className="text-red-300">Esta acción es irreversible. Se eliminarán todos los historiales y fotos guardadas.</p>
+          <p className="text-red-300">Esta acción es irreversible. Se eliminarán todos los datos LOCALES de este dispositivo.</p>
           <div className="flex gap-3 mt-4">
             <Button variant="secondary" fullWidth onClick={() => setShowResetModal(false)}>Cancelar</Button>
-            <Button variant="danger" fullWidth onClick={handleReset}>Sí, Borrar</Button>
+            <Button variant="danger" fullWidth onClick={handleReset}>Sí, Borrar Locales</Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={showFirebasePinModal} onClose={() => setShowFirebasePinModal(false)} title="Seguridad Requerida">
+        <div className="space-y-4">
+          <p className="text-slate-300">Ingresa el PIN de seguridad para borrar datos de la nube.</p>
+          <Input
+            type="password"
+            placeholder="PIN de Borrado Firebase"
+            value={deletePinInput}
+            onChange={e => setDeletePinInput(e.target.value)}
+            className="text-center tracking-widest text-xl"
+          />
+          <div className="flex gap-3 mt-4">
+            <Button variant="secondary" fullWidth onClick={() => setShowFirebasePinModal(false)}>Cancelar</Button>
+            <Button variant="danger" fullWidth onClick={handleVerifyFirebasePin}>Verificar</Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={showFirebaseResetModal} onClose={() => setShowFirebaseResetModal(false)} title="¿Borrar Datos de Firebase?">
+        <div className="space-y-4">
+          <p className="text-red-300 font-bold">⚠️ PELIGRO: ESTA ACCIÓN AFECTA A TODOS LOS USUARIOS</p>
+          <p className="text-slate-300">Se eliminarán permanentemente todos los datos guardados en la nube (Firebase). Esta acción no se puede deshacer.</p>
+          <div className="flex gap-3 mt-4">
+            <Button variant="secondary" fullWidth onClick={() => setShowFirebaseResetModal(false)}>Cancelar</Button>
+            <Button variant="danger" fullWidth onClick={handleClearFirebase}>Sí, Borrar Nube</Button>
           </div>
         </div>
       </Modal>

@@ -10,6 +10,7 @@ import AdminApp from './AdminApp';
 function App() {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [showSplash, setShowSplash] = useState(true);
 
     useEffect(() => {
         // Ensure anonymous sign-in happens before checking auth state
@@ -22,13 +23,29 @@ function App() {
             setLoading(false);
         });
 
-        return unsubscribe;
+        // Splash screen timer
+        const timer = setTimeout(() => {
+            setShowSplash(false);
+        }, 3000);
+
+        return () => {
+            unsubscribe();
+            clearTimeout(timer);
+        };
     }, []);
 
-    if (loading) {
+    if (loading || showSplash) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-slate-900">
-                <div className="text-white text-xl">Cargando...</div>
+            <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-900 transition-opacity duration-700">
+                <div className="animate-pulse flex flex-col items-center">
+                    <img
+                        src="/icon.png"
+                        alt="Delfín Suite"
+                        className="w-48 h-48 object-contain mb-8 drop-shadow-2xl"
+                    />
+                    <h1 className="text-3xl font-bold text-white tracking-widest uppercase">Delfín Suite</h1>
+                    <p className="text-slate-400 mt-2 text-sm">v2.0.0</p>
+                </div>
             </div>
         );
     }
