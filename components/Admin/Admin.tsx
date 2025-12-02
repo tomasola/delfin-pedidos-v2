@@ -3,6 +3,7 @@ import * as localStorageService from '../../services/localStorageService';
 import * as firebaseStorageService from '../../services/firebaseStorageService';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { compressImage } from '../../utils/imageCompression';
 import { Download, Upload, Trash2, Lock, Unlock, Smartphone, Cloud, Loader2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 
@@ -199,8 +200,6 @@ export const Admin: React.FC = () => {
             // Comprimir imágenes si son base64 (no URLs)
             if (record.originalImage && record.originalImage.startsWith('data:')) {
               try {
-                // Importar dinámicamente la función de compresión
-                const { compressImage } = await import('../utils/imageCompression');
                 const compressed = await compressImage(record.originalImage, 150);
                 recordData.originalImage = compressed;
                 console.log(`🗜️ Imagen original comprimida: ${record.originalImage.length} → ${compressed.length} bytes`);
@@ -214,7 +213,6 @@ export const Admin: React.FC = () => {
 
             if (record.croppedImage && record.croppedImage.startsWith('data:')) {
               try {
-                const { compressImage } = await import('../utils/imageCompression');
                 const compressed = await compressImage(record.croppedImage, 150);
                 recordData.croppedImage = compressed;
                 console.log(`🗜️ Imagen recortada comprimida: ${record.croppedImage.length} → ${compressed.length} bytes`);
@@ -227,7 +225,6 @@ export const Admin: React.FC = () => {
 
             if (record.packingPhoto && record.packingPhoto.startsWith('data:')) {
               try {
-                const { compressImage } = await import('../utils/imageCompression');
                 const compressed = await compressImage(record.packingPhoto, 150);
                 recordData.packingPhoto = compressed;
                 console.log(`🗜️ Foto packing comprimida: ${record.packingPhoto.length} → ${compressed.length} bytes`);
