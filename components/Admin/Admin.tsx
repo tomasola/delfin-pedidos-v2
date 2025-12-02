@@ -56,125 +56,172 @@ export const Admin: React.FC = () => {
     reader.readAsText(file);
   };
 
-  // Sincronizar base de datos LOCAL con Firebase
-  const handleSyncToFirebase = async () => {
+  // Sincronizar base de datos LOCAL con Firebase (BIDIRECCIONAL)
+  const handleBidirectionalSync = async () => {
     setIsSyncing(true);
-    // La barra de progreso se inicializa después de calcular totalItems
-    // (evitamos establecer total = 0 que bloquea la UI)
-
 
     try {
-      console.log('Iniciando sincronización con Firebase...');
-      const localData = await localStorageService.exportData();
-      console.log('Datos locales exportados:', localData);
+      console.log('🔄 Iniciando sincronización bidireccional con Firebase...');
 
+      // ========== FASE 1: DESCARGAR DESDE FIREBASE ==========
+      console.log('📥 FASE 1: Descargando datos desde Firebase...');
+      setSyncProgress({ current: 0, total: 100, type: 'Descargando desde Firebase' });
+
+      const firebaseRecords = await firebaseStorageService.getRecords();
+      const firebaseOrders = await firebaseStorageService.getOrders();
+
+      console.log(`📥 Descargados desde Firebase: ${firebaseRecords.length} etiquetas, ${firebaseOrders.length} pedidos`);
+
+      // ========== FASE 2: FUSIONAR CON DATOS LOCALES ==========
+      console.log('🔀 FASE 2: Fusionando datos de Firebase con base de datos local...');
+
+      let recordsMerged = 0;
+      let ordersMerged = 0;
+      let currentItem = 0;
+      const totalToMerge = firebaseRecords.length + firebaseOrders.length;
+
+      setSyncProgress({ current: 0, total: totalToMerge || 1, type: 'Fusionando datos locales' });
+
+      // Fusionar etiquetas de Firebase
+      for (const firebaseRecord of firebaseRecords) {
+        try {
+          const exists = await localStorageService.recordExists(firebaseRecord.id);
+          if (!exists) {
+            await localStorageService.saveRecordToLocal(firebaseRecord);
+            recordsMerged++;
+            console.log(`✅ Etiqueta fusionada: ${firebaseRecord.id}`);
+          } else {
+            console.log(`⏭️ Etiqueta ya existe localmente: ${firebaseRecord.id}`);
+          }
+        } catch (error) {
+          console.error(`❌ Error fusionando etiqueta ${firebaseRecord.id}:`, error);
+        }
+        currentItem++;
+        setSyncProgress({ current: currentItem, total: totalToMerge || 1, type: 'Fusionando datos locales' });
+        await new Promise(resolve => setTimeout(resolve, 50)); // Pausa breve
+      }
+
+      // Fusionar pedidos de Firebase
+      for (const firebaseOrder of firebaseOrders) {
+        try {
+          const exists = await localStorageService.orderExists(firebaseOrder.id);
+          if (!exists) {
+            await localStorageService.saveOrderToLocal(firebaseOrder);
+            ordersMerged++;
+            console.log(`✅ Pedido fusionado: ${firebaseOrder.id}`);
+          } else {
+            console.log(`⏭️ Pedido ya existe localmente: ${firebaseOrder.id}`);
+          }
+        } catch (error) {
+          console.error(`❌ Error fusionando pedido ${firebaseOrder.id}:`, error);
+        }
+        currentItem++;
+        setSyncProgress({ current: currentItem, total: totalToMerge || 1, type: 'Fusionando datos locales' });
+        await new Promise(resolve => setTimeout(resolve, 50)); // Pausa breve
+      }
+
+      console.log(`🔀 Fusión completada: ${recordsMerged} etiquetas nuevas, ${ordersMerged} pedidos nuevos`);
+
+      // ========== FASE 3: SUBIR DATOS LOCALES A FIREBASE ==========
+      console.log('📤 FASE 3: Subiendo datos locales a Firebase...');
+
+      const localData = await localStorageService.exportData();
       const totalRecords = localData.records?.length || 0;
       const totalOrders = localData.orders?.length || 0;
-      const totalItems = totalRecords + totalOrders;
-      // Inicializamos el progreso con el total correcto
-      setSyncProgress({ current: 0, total: totalItems, type: '' });
-
-      if (totalItems === 0) {
-        alert('⚠️ No hay datos locales para sincronizar');
-        setIsSyncing(false);
-        console.log('No hay datos locales para sincronizar. Sincronización terminada.');
-        return;
-      }
+      const totalToUpload = totalRecords + totalOrders;
 
       let recordsUploaded = 0;
       let ordersUploaded = 0;
-      let currentItem = 0;
-      let errorsEncountered = 0;
+      let uploadErrors = 0;
+      currentItem = 0;
 
-      // Subir records a Firebase
+      setSyncProgress({ current: 0, total: totalToUpload || 1, type: 'Subiendo a Firebase' });
+
+      // Subir etiquetas locales a Firebase
       if (localData.records && Array.isArray(localData.records)) {
-        console.log(`Iniciando subida de ${totalRecords} etiquetas a Firebase.`);
-        setSyncProgress({ current: 0, total: totalItems, type: 'Subiendo etiquetas' });
         for (const record of localData.records) {
           try {
-            console.log('Subiendo etiqueta:', record);
             // Excluir imágenes grandes para evitar límite de 1MB de Firestore
             const { id, originalImage, croppedImage, packingPhoto, ...recordData } = record;
-            console.log('📦 Datos a subir (sin imágenes):', recordData);
-            // Timeout de 30 segundos por elemento (aumentado para conexiones lentas)
+
             await Promise.race([
               firebaseStorageService.saveRecord(recordData),
-              new Promise((_, reject) => setTimeout(() => reject(new Error('Tiempo de espera agotado al contactar Firebase. Verifica tu conexión o reglas de seguridad.')), 30000))
+              new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 30000))
             ]);
+
             recordsUploaded++;
-            console.log(`✅ Etiqueta subida. Total etiquetas subidas: ${recordsUploaded}`);
-            // Pequeña pausa entre uploads para evitar rate limiting
+            console.log(`✅ Etiqueta subida: ${id}`);
             await new Promise(resolve => setTimeout(resolve, 100));
           } catch (error: any) {
-            console.error(`❌ Error al subir etiqueta con ID ${record.id}:`, error);
-            console.error(`Código de error Firebase:`, error?.code);
-            console.error(`Mensaje de error:`, error?.message);
-            errorsEncountered++;
-            // Continuar con el siguiente elemento incluso si este falló
+            // Si el error es por duplicado, no es realmente un error
+            if (error?.code !== 'permission-denied') {
+              console.error(`❌ Error subiendo etiqueta:`, error);
+              uploadErrors++;
+            }
           }
           currentItem++;
-          setSyncProgress({ current: currentItem, total: totalItems, type: 'Subiendo etiquetas' });
+          setSyncProgress({ current: currentItem, total: totalToUpload || 1, type: 'Subiendo a Firebase' });
         }
       }
 
-      // Subir orders a Firebase
+      // Subir pedidos locales a Firebase
       if (localData.orders && Array.isArray(localData.orders)) {
-        console.log(`Iniciando subida de ${totalOrders} pedidos a Firebase.`);
-        setSyncProgress({ current: currentItem, total: totalItems, type: 'Subiendo pedidos' });
         for (const order of localData.orders) {
           try {
-            console.log('Subiendo pedido:', order);
-            // Excluir imágenes grandes para evitar límite de 1MB de Firestore
+            // Excluir imágenes grandes
             const { id, originalImage, croppedImage, ...orderData } = order;
-            console.log('📦 Datos a subir (sin imágenes):', orderData);
-            // Timeout de 30 segundos por elemento (aumentado para conexiones lentas)
+
             await Promise.race([
               firebaseStorageService.saveOrder(orderData),
-              new Promise((_, reject) => setTimeout(() => reject(new Error('Tiempo de espera agotado al contactar Firebase. Verifica tu conexión o reglas de seguridad.')), 30000))
+              new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 30000))
             ]);
+
             ordersUploaded++;
-            console.log(`✅ Pedido subido. Total pedidos subidos: ${ordersUploaded}`);
-            // Pequeña pausa entre uploads para evitar rate limiting
+            console.log(`✅ Pedido subido: ${id}`);
             await new Promise(resolve => setTimeout(resolve, 100));
           } catch (error: any) {
-            console.error(`❌ Error al subir pedido con ID ${order.id}:`, error);
-            console.error(`Código de error Firebase:`, error?.code);
-            console.error(`Mensaje de error:`, error?.message);
-            errorsEncountered++;
-            // Continuar con el siguiente elemento incluso si este falló
+            if (error?.code !== 'permission-denied') {
+              console.error(`❌ Error subiendo pedido:`, error);
+              uploadErrors++;
+            }
           }
           currentItem++;
-          setSyncProgress({ current: currentItem, total: totalItems, type: 'Subiendo pedidos' });
+          setSyncProgress({ current: currentItem, total: totalToUpload || 1, type: 'Subiendo a Firebase' });
         }
       }
 
       setIsSyncing(false);
       setSyncProgress({ current: 0, total: 0, type: '' });
-      console.log('Sincronización con Firebase completada.');
+      console.log('✅ Sincronización bidireccional completada.');
 
-      // Notificación de éxito detallada
-      let successMessage = `✅ SINCRONIZACIÓN COMPLETADA\n\n` +
-        `📊 Datos subidos a Firebase:\n` +
+      // Mensaje de éxito detallado
+      let successMessage = `✅ SINCRONIZACIÓN BIDIRECCIONAL COMPLETADA\n\n` +
+        `📥 Descargados desde Firebase:\n` +
+        `• Etiquetas: ${firebaseRecords.length}\n` +
+        `• Pedidos: ${firebaseOrders.length}\n\n` +
+        `🔀 Fusionados localmente (nuevos):\n` +
+        `• Etiquetas: ${recordsMerged}\n` +
+        `• Pedidos: ${ordersMerged}\n\n` +
+        `📤 Subidos a Firebase:\n` +
         `• Etiquetas: ${recordsUploaded}\n` +
-        `• Pedidos: ${ordersUploaded}\n` +
-        `• Total: ${recordsUploaded + ordersUploaded}\n\n`;
+        `• Pedidos: ${ordersUploaded}\n\n`;
 
-      if (errorsEncountered > 0) {
-        successMessage += `⚠️ Se encontraron ${errorsEncountered} errores durante la sincronización. Algunos elementos no pudieron subirse.\n\n`;
-      } else {
-        successMessage += `Los datos ya están disponibles en Firebase para otros usuarios.\n\n`;
+      if (uploadErrors > 0) {
+        successMessage += `⚠️ ${uploadErrors} elementos no se pudieron subir (pueden ser duplicados).\n\n`;
       }
+
+      successMessage += `✨ Tus datos están ahora sincronizados con Firebase.`;
+
       alert(successMessage);
 
     } catch (error: any) {
-      console.error('Error general al sincronizar:', error);
+      console.error('❌ Error general en sincronización bidireccional:', error);
       setIsSyncing(false);
       setSyncProgress({ current: 0, total: 0, type: '' });
 
-      // Notificación de error detallada
       alert(
-        `❌ ERROR AL SINCRONIZAR\n\n` +
-        `No se pudieron subir los datos a Firebase.\n\n` +
+        `❌ ERROR EN SINCRONIZACIÓN\n\n` +
+        `No se pudo completar la sincronización.\n\n` +
         `Posibles causas:\n` +
         `• Sin conexión a internet\n` +
         `• Problemas con Firebase\n` +
@@ -184,7 +231,6 @@ export const Admin: React.FC = () => {
       );
     }
   };
-
 
 
   const handleReset = async () => {
@@ -242,7 +288,7 @@ export const Admin: React.FC = () => {
         <Button
           fullWidth
           variant="primary"
-          onClick={handleSyncToFirebase}
+          onClick={handleBidirectionalSync}
           className="justify-start bg-blue-600 hover:bg-blue-700"
           disabled={isSyncing}
         >

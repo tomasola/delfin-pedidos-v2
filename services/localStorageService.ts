@@ -48,6 +48,29 @@ export const deleteRecord = async (id: string): Promise<void> => {
     }
 };
 
+// Check if a record exists locally
+export const recordExists = async (id: string): Promise<boolean> => {
+    try {
+        const db = await initDB();
+        const record = await db.get('records', id);
+        return !!record;
+    } catch (e) {
+        console.error("Error checking record existence", e);
+        return false;
+    }
+};
+
+// Save a record from Firebase to local storage (with existing ID)
+export const saveRecordToLocal = async (record: Record): Promise<void> => {
+    try {
+        const db = await initDB();
+        await db.put('records', record);
+    } catch (e) {
+        console.error("Error saving Firebase record to local DB", e);
+        throw e;
+    }
+};
+
 // ============ PEDIDOS (ORDERS) ============
 
 export const getOrders = async (): Promise<OrderRecord[]> => {
@@ -94,6 +117,29 @@ export const deleteOrder = async (id: string): Promise<void> => {
         await db.delete('orders', id);
     } catch (e) {
         console.error("Error deleting order", e);
+        throw e;
+    }
+};
+
+// Check if an order exists locally
+export const orderExists = async (id: string): Promise<boolean> => {
+    try {
+        const db = await initDB();
+        const order = await db.get('orders', id);
+        return !!order;
+    } catch (e) {
+        console.error("Error checking order existence", e);
+        return false;
+    }
+};
+
+// Save an order from Firebase to local storage (with existing ID)
+export const saveOrderToLocal = async (order: OrderRecord): Promise<void> => {
+    try {
+        const db = await initDB();
+        await db.put('orders', order);
+    } catch (e) {
+        console.error("Error saving Firebase order to local DB", e);
         throw e;
     }
 };
