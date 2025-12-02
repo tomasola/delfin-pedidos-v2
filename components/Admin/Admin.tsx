@@ -412,7 +412,7 @@ export const Admin: React.FC = () => {
           <label className="text-xs text-slate-400">Cambiar PIN de Administrador</label>
           <Input
             type="password"
-            placeholder="PIN Actual o Maestro (10061978)"
+            placeholder="PIN Actual"
             value={currentAdminPinInput}
             onChange={e => setCurrentAdminPinInput(e.target.value)}
             className="mb-2"
@@ -432,7 +432,7 @@ export const Admin: React.FC = () => {
           <label className="text-xs text-slate-400">Cambiar PIN Borrado Firebase</label>
           <Input
             type="password"
-            placeholder="PIN Actual o Maestro (10061978)"
+            placeholder="PIN Actual"
             value={currentFirebasePinInput}
             onChange={e => setCurrentFirebasePinInput(e.target.value)}
             className="mb-2"
