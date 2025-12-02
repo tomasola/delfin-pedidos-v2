@@ -196,13 +196,16 @@ export const Admin: React.FC = () => {
             const { id, ...baseData } = record;
             let recordData: any = { ...baseData };
 
-            // Subir imágenes a Storage si existen y son base64 (no URLs)
+            // Comprimir imágenes si son base64 (no URLs)
             if (record.originalImage && record.originalImage.startsWith('data:')) {
               try {
-                const url = await firebaseStorageService.uploadImage(record.originalImage, `images/${record.id}/original.jpg`);
-                recordData.originalImage = url;
+                // Importar dinámicamente la función de compresión
+                const { compressImage } = await import('../utils/imageCompression');
+                const compressed = await compressImage(record.originalImage, 150);
+                recordData.originalImage = compressed;
+                console.log(`🗜️ Imagen original comprimida: ${record.originalImage.length} → ${compressed.length} bytes`);
               } catch (e) {
-                console.error("Error subiendo imagen original:", e);
+                console.error("Error comprimiendo imagen original:", e);
                 // Si falla, excluir la imagen del objeto
                 const { originalImage, ...rest } = recordData;
                 recordData = rest;
@@ -211,10 +214,12 @@ export const Admin: React.FC = () => {
 
             if (record.croppedImage && record.croppedImage.startsWith('data:')) {
               try {
-                const url = await firebaseStorageService.uploadImage(record.croppedImage, `images/${record.id}/cropped.jpg`);
-                recordData.croppedImage = url;
+                const { compressImage } = await import('../utils/imageCompression');
+                const compressed = await compressImage(record.croppedImage, 150);
+                recordData.croppedImage = compressed;
+                console.log(`🗜️ Imagen recortada comprimida: ${record.croppedImage.length} → ${compressed.length} bytes`);
               } catch (e) {
-                console.error("Error subiendo imagen recortada:", e);
+                console.error("Error comprimiendo imagen recortada:", e);
                 const { croppedImage, ...rest } = recordData;
                 recordData = rest;
               }
@@ -222,10 +227,12 @@ export const Admin: React.FC = () => {
 
             if (record.packingPhoto && record.packingPhoto.startsWith('data:')) {
               try {
-                const url = await firebaseStorageService.uploadImage(record.packingPhoto, `images/${record.id}/packing.jpg`);
-                recordData.packingPhoto = url;
+                const { compressImage } = await import('../utils/imageCompression');
+                const compressed = await compressImage(record.packingPhoto, 150);
+                recordData.packingPhoto = compressed;
+                console.log(`🗜️ Foto packing comprimida: ${record.packingPhoto.length} → ${compressed.length} bytes`);
               } catch (e) {
-                console.error("Error subiendo foto packing:", e);
+                console.error("Error comprimiendo foto packing:", e);
                 const { packingPhoto, ...rest } = recordData;
                 recordData = rest;
               }
@@ -233,7 +240,7 @@ export const Admin: React.FC = () => {
 
             await Promise.race([
               firebaseStorageService.saveRecord(recordData, record.id), // Pasar el ID para evitar duplicados
-              new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 60000)) // Aumentado timeout para imágenes
+              new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 60000))
             ]);
 
             recordsUploaded++;
