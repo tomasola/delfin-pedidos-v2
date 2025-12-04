@@ -1,15 +1,13 @@
-import React, { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import * as localStorageService from '../../services/localStorageService';
 import * as firebaseStorageService from '../../services/firebaseStorageService';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { compressImage } from '../../utils/imageCompression';
-import { Download, Upload, Trash2, Lock, Unlock, Smartphone, Cloud, Loader2 } from 'lucide-react';
+import { Download, Upload, Trash2, Smartphone, Cloud, Loader2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 
 export const Admin: React.FC = () => {
-  const [isUnlocked, setIsUnlocked] = useState(false);
-  const [pin, setPin] = useState('');
   const [showResetModal, setShowResetModal] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState({ current: 0, total: 0, type: '' });
@@ -24,16 +22,6 @@ export const Admin: React.FC = () => {
   const [showFirebasePinModal, setShowFirebasePinModal] = useState(false);
 
   const MASTER_KEY = '10061978';
-
-  const handleLogin = () => {
-    const currentPin = localStorageService.getAdminPin();
-    if (pin === currentPin || pin === MASTER_KEY) {
-      setIsUnlocked(true);
-      setPin('');
-    } else {
-      alert("PIN Incorrecto");
-    }
-  };
 
   // ... (Export/Import/Sync functions remain unchanged) ...
 
@@ -384,32 +372,10 @@ export const Admin: React.FC = () => {
     }
   };
 
-  if (!isUnlocked) {
-    return (
-      <div className="h-full flex flex-col items-center justify-center p-6 gap-6 bg-slate-900">
-        <div className="bg-slate-800 p-6 rounded-full">
-          <Lock size={48} className="text-slate-500" />
-        </div>
-        <h2 className="text-2xl font-bold text-white">Acceso Restringido</h2>
-        <div className="w-full max-w-xs">
-          <Input
-            type="password"
-            placeholder="PIN (1234)"
-            value={pin}
-            onChange={e => setPin(e.target.value)}
-            className="text-center tracking-widest text-xl"
-          />
-          <Button fullWidth onClick={handleLogin} className="mt-4">Desbloquear</Button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="p-6 h-full overflow-y-auto bg-slate-900 pb-24 space-y-8">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-white">Administración</h2>
-        <Button variant="ghost" onClick={() => setIsUnlocked(false)}><Unlock size={20} /></Button>
       </div>
 
       {/* Data Management */}

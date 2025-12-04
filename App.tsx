@@ -46,11 +46,7 @@ function App() {
                 <Route path="/analisis-pedidos" element={<AnalisisPedidosApp />} />
                 <Route
                     path="/admin"
-                    element={
-                        <ProtectedRoute user={user}>
-                            <AdminApp />
-                        </ProtectedRoute>
-                    }
+                    element={<AdminApp />}
                 />
             </Routes>
         </Router>
