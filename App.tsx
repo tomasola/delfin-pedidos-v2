@@ -50,17 +50,17 @@ function App() {
         );
     }
 
-    if (!user) {
-        return <Login />;
-    }
-
     return (
         <Router>
             <Routes>
                 <Route path="/" element={<Home />} />
+                <Route path="/login" element={<Login />} />
                 <Route path="/delfin-14" element={<Delfin14App />} />
                 <Route path="/analisis-pedidos" element={<AnalisisPedidosApp />} />
-                <Route path="/admin" element={<AdminApp />} />
+                <Route
+                    path="/admin"
+                    element={user ? <AdminApp /> : <Login />}
+                />
             </Routes>
         </Router>
     );
