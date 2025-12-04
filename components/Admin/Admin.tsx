@@ -16,12 +16,11 @@ export const Admin: React.FC = () => {
   // Security State
   const [newAdminPin, setNewAdminPin] = useState('');
   const [currentAdminPinInput, setCurrentAdminPinInput] = useState('');
-  const [newFirebasePin, setNewFirebasePin] = useState('');
-  const [currentFirebasePinInput, setCurrentFirebasePinInput] = useState('');
   const [deletePinInput, setDeletePinInput] = useState('');
   const [showFirebasePinModal, setShowFirebasePinModal] = useState(false);
 
   const MASTER_KEY = '10061978';
+  const FIREBASE_DELETE_PIN = '10061978'; // Fixed PIN for Firebase deletion
 
   // ... (Export/Import/Sync functions remain unchanged) ...
 
@@ -44,24 +43,7 @@ export const Admin: React.FC = () => {
     alert("✅ PIN de Administrador actualizado correctamente");
   };
 
-  const handleUpdateFirebasePin = () => {
-    const currentPin = localStorageService.getFirebaseDeletePin();
 
-    if (currentFirebasePinInput !== currentPin && currentFirebasePinInput !== MASTER_KEY) {
-      alert("❌ El PIN actual es incorrecto");
-      return;
-    }
-
-    if (newFirebasePin.length < 4) {
-      alert("El nuevo PIN debe tener al menos 4 caracteres");
-      return;
-    }
-
-    localStorageService.setFirebaseDeletePin(newFirebasePin);
-    setNewFirebasePin('');
-    setCurrentFirebasePinInput('');
-    alert("✅ PIN de Borrado de Firebase actualizado correctamente");
-  };
 
   // Exportar base de datos LOCAL
   const handleExportLocal = async () => {
@@ -321,11 +303,10 @@ export const Admin: React.FC = () => {
   const [showFirebaseResetModal, setShowFirebaseResetModal] = useState(false);
 
   const handleVerifyFirebasePin = () => {
-    const correctPin = localStorageService.getFirebaseDeletePin();
-    if (deletePinInput === correctPin) {
+    if (deletePinInput === FIREBASE_DELETE_PIN) {
       setShowFirebasePinModal(false);
       setDeletePinInput('');
-      setShowFirebaseResetModal(true); // Show confirmation modal
+      setShowFirebaseResetModal(true);
     } else {
       alert("❌ PIN Incorrecto");
     }
@@ -465,26 +446,6 @@ export const Admin: React.FC = () => {
               onChange={e => setNewAdminPin(e.target.value)}
             />
             <Button onClick={handleUpdateAdminPin} variant="secondary">Guardar</Button>
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <label className="text-xs text-slate-400">Cambiar PIN Borrado Firebase</label>
-          <Input
-            type="password"
-            placeholder="PIN Actual"
-            value={currentFirebasePinInput}
-            onChange={e => setCurrentFirebasePinInput(e.target.value)}
-            className="mb-2"
-          />
-          <div className="flex gap-2">
-            <Input
-              type="text"
-              placeholder="Nuevo PIN Firebase (min 4)"
-              value={newFirebasePin}
-              onChange={e => setNewFirebasePin(e.target.value)}
-            />
-            <Button onClick={handleUpdateFirebasePin} variant="secondary">Guardar</Button>
           </div>
         </div>
       </section>
