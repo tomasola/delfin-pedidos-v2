@@ -1,12 +1,22 @@
-import { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { useState, useEffect, lazy, Suspense } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Login } from './components/Auth/Login';
+import { ToastContainer } from './components/ui/ToastContainer';
+import { Loader2 } from 'lucide-react';
 import Home from './Home';
-import Delfin14App from './Delfin14App';
-import AnalisisPedidosApp from './AnalisisPedidosApp';
-import AdminApp from './AdminApp';
+
+// Lazy load heavy modules
+const Delfin14App = lazy(() => import('./Delfin14App'));
+const AnalisisPedidosApp = lazy(() => import('./AnalisisPedidosApp'));
+const AdminApp = lazy(() => import('./AdminApp'));
+
+const LoadingFallback = () => (
+    <div className="flex items-center justify-center h-screen bg-slate-900">
+        <Loader2 className="animate-spin text-blue-500" size={48} />
+    </div>
+);
 
 function App() {
     const { user, loading } = useAuth();
@@ -38,18 +48,24 @@ function App() {
     }
 
     return (
-        <Router>
-            <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/delfin-14" element={<Delfin14App />} />
-                <Route path="/analisis-pedidos" element={<AnalisisPedidosApp />} />
-                <Route
-                    path="/admin"
-                    element={<AdminApp />}
-                />
-            </Routes>
-        </Router>
+        <>
+            <ToastContainer />
+            <Router>
+                <Suspense fallback={<LoadingFallback />}>
+                    <Routes>
+                        <Route path="/" element={<Navigate to="/delfin-14" replace />} />
+                        <Route path="/menu" element={<Home />} />
+                        <Route path="/login" element={<Login />} />
+                        <Route path="/delfin-14" element={<Delfin14App />} />
+                        <Route path="/analisis-pedidos" element={<AnalisisPedidosApp />} />
+                        <Route
+                            path="/admin"
+                            element={<AdminApp />}
+                        />
+                    </Routes>
+                </Suspense>
+            </Router>
+        </>
     );
 }
 

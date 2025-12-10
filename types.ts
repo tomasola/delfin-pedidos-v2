@@ -7,6 +7,7 @@ export interface BoundingBox {
 }
 
 export interface ExtractedData {
+  documentType?: 'LABEL' | 'ORDER' | 'UNKNOWN';
   reference: string;
   length: string;
   quantity: string;
@@ -24,6 +25,7 @@ export interface Record {
   // Nuevos campos para empaque
   boxSize?: string;
   packingPhoto?: string; // Base64
+  notes?: string;
 }
 
 export type AppTab = 'scan' | 'history' | 'data' | 'admin';
@@ -46,15 +48,30 @@ export interface ProductLine {
 
 export interface OrderRecord {
   id: string;
-  clientName: string;
-  clientNumber: string;
-  orderNumber: string;
-  date: string;
-  notes: string;
-  products: ProductLine[];  // Changed from single product to array
-  originalImage: string;
-  croppedImage?: string;
-  timestamp: number;
-  status: 'pendiente' | 'completado';
+  timestamp: string;
+  orderNumber?: string;
+  customerName?: string; // NEW: Added for Excel export
+  items?: any[]; // NEW: Added for order items
+  status?: string; // NEW: Added for order status
+  notes?: string;
 }
 
+export interface SyncProgressData {
+  current: number;
+  total: number;
+  type: string;
+}
+
+export interface ExportData {
+  records: Record[];
+  orders: OrderRecord[];
+}
+
+export interface ReferenceImage {
+  id: string;           // UUID
+  reference: string;    // Product reference (e.g., "10008")
+  imageData: string;    // Base64 PNG image (high quality)
+  fileName: string;     // Original filename
+  uploadedAt: number;   // Timestamp
+  notes?: string;       // Optional description
+}

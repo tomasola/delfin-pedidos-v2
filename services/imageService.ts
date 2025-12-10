@@ -1,4 +1,4 @@
-export const compressImage = (base64Str: string, maxWidth = 2048): Promise<string> => {
+export const compressImage = (base64Str: string, maxWidth = 4096): Promise<string> => {
     return new Promise((resolve) => {
         const img = new Image();
         img.src = base64Str;

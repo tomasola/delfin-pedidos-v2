@@ -6,6 +6,7 @@ import { Input } from '../ui/Input';
 import { compressImage } from '../../utils/imageCompression';
 import { Download, Upload, Trash2, Smartphone, Cloud, Loader2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
+import { ReferenceLibraryManager } from './ReferenceLibraryManager';
 
 export const Admin: React.FC = () => {
   const [showResetModal, setShowResetModal] = useState(false);
@@ -448,6 +449,12 @@ export const Admin: React.FC = () => {
             <Button onClick={handleUpdateAdminPin} variant="secondary">Guardar</Button>
           </div>
         </div>
+      </section>
+
+      {/* Reference Library Manager */}
+      <section className="space-y-4">
+        <h3 className="text-slate-400 text-sm font-bold uppercase tracking-wider border-b border-slate-800 pb-2">Biblioteca de Referencias</h3>
+        <ReferenceLibraryManager />
       </section>
 
       {/* Danger Zone */}

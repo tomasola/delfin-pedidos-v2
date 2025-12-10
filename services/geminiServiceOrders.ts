@@ -4,6 +4,11 @@ import { ProductLine } from '../types';
 const responseSchema = {
     type: SchemaType.OBJECT,
     properties: {
+        documentType: {
+            type: SchemaType.STRING,
+            description: "Type of document detected: 'ORDER' for sales orders/invoices, 'LABEL' for industrial labels/tags, 'UNKNOWN' if unclear",
+            enum: ["ORDER", "LABEL", "UNKNOWN"]
+        },
         clientName: { type: SchemaType.STRING, description: "Nombre del cliente" },
         clientNumber: { type: SchemaType.STRING, description: "Número de cliente" },
         orderNumber: { type: SchemaType.STRING, description: "Número de pedido" },
@@ -26,10 +31,11 @@ const responseSchema = {
             }
         }
     },
-    required: ["clientName", "orderNumber", "date", "products"]
+    required: ["documentType", "clientName", "orderNumber", "date", "products"]
 } as any;
 
 export interface ExtractedOrderData {
+    documentType?: 'ORDER' | 'LABEL' | 'UNKNOWN';
     clientName?: string;
     clientNumber?: string;
     orderNumber?: string;
@@ -56,7 +62,11 @@ export const analyzeOrderImage = async (base64Image: string): Promise<ExtractedO
         });
 
         const prompt = `
-Analiza esta imagen de un pedido de venta.
+FIRST: Determine if this image is a sales ORDER/INVOICE or an industrial LABEL/TAG.
+- ORDER: Full page document with "PEDIDO DE VENTA", order number, client info, table with multiple products
+- LABEL: Small tag with reference code (REF:xxxx), dimensions (Long:, Cant:), technical drawing
+
+Then analyze this order document.
 
 Extrae la siguiente información:
 

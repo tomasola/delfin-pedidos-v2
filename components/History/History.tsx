@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { getRecords, deleteRecord, updateRecord } from '../../services/localStorageService';
 import { Record as ScanRecord } from '../../types';
@@ -7,6 +8,7 @@ import { Search, Trash2, Pencil, Check, Package, Camera, X } from 'lucide-react'
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { VisualSearchModal } from './VisualSearchModal';
 
 export const History: React.FC = () => {
   const [records, setRecords] = useState<ScanRecord[]>([]);
@@ -25,11 +27,16 @@ export const History: React.FC = () => {
   // State for Packing (Box Size + Photo)
   const [showPackingModal, setShowPackingModal] = useState(false);
   const [packingRecordId, setPackingRecordId] = useState<string | null>(null);
-  const [packingData, setPackingData] = useState({ boxSize: '', packingPhoto: '' });
+  const [packingData, setPackingData] = useState({ boxSize: '', packingPhoto: '', notes: '' });
   const packingFileInputRef = useRef<HTMLInputElement>(null);
 
   // State for Detail View
   const [selectedRecord, setSelectedRecord] = useState<ScanRecord | null>(null);
+  const [showPackingDetails, setShowPackingDetails] = useState(false);
+  const [showOriginalImage, setShowOriginalImage] = useState(false);
+
+  // State for Visual Search
+  const [showVisualSearch, setShowVisualSearch] = useState(false);
 
   useEffect(() => {
     getRecords().then(setRecords);
@@ -101,7 +108,8 @@ export const History: React.FC = () => {
     setPackingRecordId(record.id);
     setPackingData({
       boxSize: record.boxSize || '',
-      packingPhoto: record.packingPhoto || ''
+      packingPhoto: record.packingPhoto || '',
+      notes: record.notes || ''
     });
     setShowPackingModal(true);
   };
@@ -126,7 +134,8 @@ export const History: React.FC = () => {
         const updatedRecord = {
           ...recordToUpdate,
           boxSize: packingData.boxSize,
-          packingPhoto: packingData.packingPhoto
+          packingPhoto: packingData.packingPhoto,
+          notes: packingData.notes
         };
         await updateRecord(updatedRecord);
         const refreshed = await getRecords();
@@ -143,8 +152,8 @@ export const History: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-slate-900">
-      <div className="p-4 bg-slate-800 border-b border-slate-700 sticky top-0 z-10">
-        <div className="relative">
+      <div className="p-4 bg-slate-800 border-b border-slate-700 sticky top-0 z-10 flex gap-2">
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-3.5 text-slate-400" size={18} />
           <input
             type="text"
@@ -154,6 +163,13 @@ export const History: React.FC = () => {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        <button
+          onClick={() => setShowVisualSearch(true)}
+          className="bg-amber-600 hover:bg-amber-700 text-white p-3 rounded-lg flex items-center justify-center transition-colors shadow-lg shadow-amber-900/20 active:scale-95"
+          title="Búsqueda Visual por Foto"
+        >
+          <Camera size={20} />
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 pb-24 space-y-3">
@@ -165,7 +181,11 @@ export const History: React.FC = () => {
           filteredRecords.map(record => (
             <div key={record.id} className="bg-slate-800 rounded-lg p-3 flex items-center gap-3 border border-slate-700/50 shadow-sm">
               <div
-                onClick={() => setSelectedRecord(record)}
+                onClick={() => {
+                  setSelectedRecord(record);
+                  setShowPackingDetails(false);
+                  setShowOriginalImage(false);
+                }}
                 className="w-16 h-16 bg-white rounded overflow-hidden flex-shrink-0 flex items-center justify-center relative cursor-pointer hover:ring-2 hover:ring-amber-500 transition-all"
               >
                 {record.croppedImage ? (
@@ -179,7 +199,11 @@ export const History: React.FC = () => {
                 )}
               </div>
 
-              <div className="flex-1 min-w-0" onClick={() => setSelectedRecord(record)}>
+              <div className="flex-1 min-w-0" onClick={() => {
+                setSelectedRecord(record);
+                setShowPackingDetails(false);
+                setShowOriginalImage(false);
+              }}>
                 <h3 className="text-white font-bold truncate">{record.reference}</h3>
                 <p className="text-slate-400 text-xs">L: {record.length} • Qty: {record.quantity}</p>
                 {record.boxSize && <p className="text-amber-500 text-[10px] mt-1">Caja: {record.boxSize}</p>}
@@ -211,6 +235,16 @@ export const History: React.FC = () => {
           ))
         )}
       </div>
+
+      {/* Visual Search Modal */}
+      <VisualSearchModal
+        isOpen={showVisualSearch}
+        onClose={() => setShowVisualSearch(false)}
+        onMatchFound={(reference) => {
+          setSearch(reference);
+          setShowVisualSearch(false);
+        }}
+      />
 
       {/* Modal for Delete Confirmation */}
       <Modal
@@ -293,6 +327,16 @@ export const History: React.FC = () => {
             value={packingData.boxSize}
             onChange={(e) => setPackingData({ ...packingData, boxSize: e.target.value })}
           />
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-slate-400">Notas</label>
+            <textarea
+              className="w-full bg-slate-900 text-white rounded-lg border border-slate-700 p-3 focus:ring-2 focus:ring-amber-500 outline-none text-sm resize-none"
+              rows={3}
+              placeholder="Notas adicionales..."
+              value={packingData.notes}
+              onChange={(e) => setPackingData({ ...packingData, notes: e.target.value })}
+            />
+          </div>
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-slate-400">Foto del Empaque</label>
@@ -359,24 +403,38 @@ export const History: React.FC = () => {
             {/* Content */}
             <div className="overflow-y-auto p-6 space-y-6">
               {/* Main Image */}
-              <div className="bg-white rounded-xl overflow-hidden border-4 border-slate-700 shadow-lg cursor-pointer hover:border-amber-500 transition-colors">
-                {selectedRecord.croppedImage ? (
-                  <img
-                    src={selectedRecord.croppedImage}
-                    alt="Dibujo Técnico"
-                    className="w-full h-auto object-contain max-h-[60vh] bg-white"
-                    style={{
-                      imageRendering: '-webkit-optimize-contrast' as any,
-                      backfaceVisibility: 'hidden',
-                      transform: 'translateZ(0)',
-                      WebkitBackfaceVisibility: 'hidden',
-                      WebkitTransform: 'translateZ(0)'
-                    }}
-                    onClick={() => window.open(selectedRecord.croppedImage, '_blank')}
-                    title="Click para ver en tamaño completo"
-                  />
-                ) : (
-                  <div className="h-40 flex items-center justify-center text-slate-400">Sin imagen</div>
+              <div className="relative">
+                <div className="bg-white rounded-xl overflow-hidden border-4 border-slate-700 shadow-lg">
+                  {selectedRecord.croppedImage || selectedRecord.originalImage ? (
+                    <img
+                      src={showOriginalImage && selectedRecord.originalImage ? selectedRecord.originalImage : selectedRecord.croppedImage}
+                      alt="Dibujo Técnico"
+                      className="w-full h-auto object-contain max-h-[60vh] bg-white"
+                      style={{
+                        imageRendering: '-webkit-optimize-contrast' as any,
+                        backfaceVisibility: 'hidden',
+                        transform: 'translateZ(0)',
+                        WebkitBackfaceVisibility: 'hidden',
+                        WebkitTransform: 'translateZ(0)'
+                      }}
+                    />
+                  ) : (
+                    <div className="h-40 flex items-center justify-center text-slate-400">Sin imagen</div>
+                  )}
+                </div>
+
+                {/* Toggle Original/Crop Button */}
+                {selectedRecord.originalImage && (
+                  <button
+                    onClick={() => setShowOriginalImage(!showOriginalImage)}
+                    className="absolute top-2 right-2 bg-slate-900/80 backdrop-blur text-white px-3 py-1.5 rounded-full text-xs font-bold border border-slate-600 shadow-lg hover:bg-amber-500 hover:border-amber-400 transition-all flex items-center gap-2"
+                  >
+                    {showOriginalImage ? (
+                      <>Ver Recorte</>
+                    ) : (
+                      <>Ver Original (Foto)</>
+                    )}
+                  </button>
                 )}
               </div>
 
@@ -399,22 +457,41 @@ export const History: React.FC = () => {
               </div>
 
               {/* Packing Info if exists */}
-              {(selectedRecord.boxSize || selectedRecord.packingPhoto) && (
-                <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
-                  <h4 className="text-sm font-bold text-slate-300 mb-3 flex items-center">
-                    <Package size={16} className="mr-2 text-amber-500" /> Datos de Empaque
-                  </h4>
+              {(selectedRecord.boxSize || selectedRecord.packingPhoto || selectedRecord.notes) && (
+                <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
+                  <button
+                    onClick={() => setShowPackingDetails(!showPackingDetails)}
+                    className="w-full p-4 flex items-center justify-between bg-slate-800 hover:bg-slate-750 transition-colors"
+                  >
+                    <span className="text-sm font-bold text-slate-300 flex items-center">
+                      <Package size={16} className="mr-2 text-amber-500" /> Datos de Empaque
+                    </span>
+                    <span className={`text-slate-400 transition-transform ${showPackingDetails ? 'rotate-180' : ''}`}>
+                      ▼
+                    </span>
+                  </button>
 
-                  {selectedRecord.boxSize && (
-                    <div className="mb-3">
-                      <label className="text-xs text-slate-500">Caja</label>
-                      <div className="text-lg text-slate-200">{selectedRecord.boxSize}</div>
-                    </div>
-                  )}
+                  {showPackingDetails && (
+                    <div className="p-4 border-t border-slate-700/50 animate-in slide-in-from-top-2">
+                      {selectedRecord.boxSize && (
+                        <div className="mb-3">
+                          <label className="text-xs text-slate-500">Caja</label>
+                          <div className="text-lg text-slate-200">{selectedRecord.boxSize}</div>
+                        </div>
+                      )}
 
-                  {selectedRecord.packingPhoto && (
-                    <div className="rounded-lg overflow-hidden border border-slate-700">
-                      <img src={selectedRecord.packingPhoto} alt="Foto Empaque" className="w-full h-auto" />
+                      {selectedRecord.notes && (
+                        <div className="mb-3">
+                          <label className="text-xs text-slate-500">Notas</label>
+                          <div className="text-sm text-slate-300 italic whitespace-pre-wrap">{selectedRecord.notes}</div>
+                        </div>
+                      )}
+
+                      {selectedRecord.packingPhoto && (
+                        <div className="rounded-lg overflow-hidden border border-slate-700">
+                          <img src={selectedRecord.packingPhoto} alt="Foto Empaque" className="w-full h-auto" />
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

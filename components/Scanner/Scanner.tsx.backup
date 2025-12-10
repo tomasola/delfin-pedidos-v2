@@ -9,24 +9,21 @@ import { saveRecord, getRecords } from '../../services/localStorageService';
 import { generatePDF } from '../../services/pdfService';
 import { CropEditor } from './CropEditor';
 import { BoundingBox } from '../../types';
-import { DocumentTypeWarning } from '../ui/DocumentTypeWarning';
 
 export const Scanner: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const webcamRef = useRef<Webcam>(null);
-  const [status, setStatus] = useState<'idle' | 'camera' | 'analyzing' | 'review' | 'cropping' | 'manual'>('idle');
+  const [status, setStatus] = useState<'idle' | 'camera' | 'analyzing' | 'review' | 'cropping'>('idle');
   const [originalImage, setOriginalImage] = useState<string>('');
   const [croppedImage, setCroppedImage] = useState<string>('');
   const [formData, setFormData] = useState({ reference: '', length: '', quantity: '' });
   const [aiBoundingBox, setAiBoundingBox] = useState<BoundingBox | undefined>(undefined);
   const [isDuplicate, setIsDuplicate] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [detectedDocType, setDetectedDocType] = useState<'LABEL' | 'ORDER' | 'UNKNOWN' | null>(null);
-  const [showDocTypeWarning, setShowDocTypeWarning] = useState(false);
 
   // Efecto para verificar duplicados en tiempo real cuando cambia la referencia o entramos en modo revisión
   useEffect(() => {
-    if ((status === 'review' || status === 'manual') && formData.reference) {
+    if (status === 'review' && formData.reference) {
       getRecords().then(records => {
         const isDup = records.some(r => r.reference.trim().toLowerCase() === formData.reference.trim().toLowerCase());
         setIsDuplicate(isDup);
@@ -42,8 +39,7 @@ export const Scanner: React.FC = () => {
       const reader = new FileReader();
       reader.onload = async (ev) => {
         if (ev.target?.result) {
-          // Allow up to 8000px for gallery uploads (8K resolution)
-          const compressed = await compressImage(ev.target.result as string, 8000);
+          const compressed = await compressImage(ev.target.result as string);
           setOriginalImage(compressed);
           processImage(compressed);
         }
@@ -95,14 +91,6 @@ export const Scanner: React.FC = () => {
         setCroppedImage(base64);
       }
 
-      // Check document type and show warning if incorrect
-      if (result.documentType) {
-        setDetectedDocType(result.documentType);
-        if (result.documentType !== 'LABEL' && result.documentType !== 'UNKNOWN') {
-          setShowDocTypeWarning(true);
-        }
-      }
-
       setStatus('review');
     } catch (error: any) {
       console.error(error);
@@ -141,11 +129,16 @@ export const Scanner: React.FC = () => {
         canvas.height = finalH;
         ctx.drawImage(img, finalX, finalY, finalW, finalH, 0, 0, finalW, finalH);
 
-        setCroppedImage(canvas.toDataURL('image/png'));
+        setCroppedImage(canvas.toDataURL('image/jpeg', 0.8));
         resolve();
       };
       img.src = base64;
     });
+  };
+
+  const handleCrop = (croppedBase64: string) => {
+    setCroppedImage(croppedBase64);
+    setStatus('review');
   };
 
   const handleRetake = () => {
@@ -156,11 +149,24 @@ export const Scanner: React.FC = () => {
     setAiBoundingBox(undefined);
   };
 
-  const handleManualEntry = () => {
-    setStatus('manual');
-    setOriginalImage('');
-    setCroppedImage('');
-    setFormData({ reference: '', length: '', quantity: '' });
+  const handleReanalyze = () => {
+    if (originalImage) {
+      processImage(originalImage);
+    }
+  };
+
+  const handleCropMode = () => {
+    setStatus('cropping');
+  };
+
+  const preloadImage = (base64: string): Promise<void> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        resolve();
+      };
+      img.src = base64;
+    });
   };
 
   const handleSave = async () => {
@@ -263,12 +269,8 @@ export const Scanner: React.FC = () => {
         <Webcam
           audio={false}
           ref={webcamRef}
-          screenshotFormat="image/png"
-          videoConstraints={{
-            facingMode: "environment",
-            width: { ideal: 3840 },
-            height: { ideal: 2160 }
-          }}
+          screenshotFormat="image/jpeg"
+          videoConstraints={{ facingMode: "environment" }}
           className="h-full w-full object-cover"
         />
 
@@ -392,107 +394,14 @@ export const Scanner: React.FC = () => {
             )}
           </Button>
         </div>
-
-        {/* Document Type Warning Modal */}
-        {showDocTypeWarning && detectedDocType && (
-          <DocumentTypeWarning
-            detectedType={detectedDocType}
-            expectedType="LABEL"
-            onContinue={() => setShowDocTypeWarning(false)}
-            onCancel={() => {
-              setShowDocTypeWarning(false);
-              handleRetake();
-            }}
-          />
-        )}
-      </div>
-    );
-  }
-
-  if (status === 'manual') {
-    return (
-      <div className="flex flex-col h-full overflow-y-auto p-4 pb-24">
-        <h2 className="text-xl font-bold text-white mb-4">Entrada Manual</h2>
-
-        <div className="bg-slate-800 rounded-xl p-6 mb-6 shadow-lg border border-slate-700 text-center">
-          <p className="text-slate-400 text-sm mb-2">Modo sin imagen</p>
-          <div className="w-20 h-20 bg-slate-700 rounded-full mx-auto flex items-center justify-center text-slate-500">
-            <Edit3 size={32} />
-          </div>
-        </div>
-
-        {/* Data Form */}
-        <div className="space-y-4">
-          {isDuplicate && (
-            <div className="bg-red-900/30 border border-red-500/50 rounded-lg p-3 mb-2 flex items-start gap-3 animate-in slide-in-from-top-2">
-              <AlertTriangle className="text-red-500 shrink-0 mt-0.5" size={20} />
-              <div>
-                <h4 className="text-red-400 font-bold text-sm leading-tight">Referencia Duplicada</h4>
-                <p className="text-red-300/70 text-xs mt-1">El código "{formData.reference}" ya existe en la base de datos.</p>
-              </div>
-            </div>
-          )}
-
-          <Input
-            label="Referencia / ID"
-            value={formData.reference}
-            onChange={e => setFormData({ ...formData, reference: e.target.value })}
-            className={isDuplicate ? "border-red-500 focus:ring-red-500" : ""}
-            placeholder="Ingrese referencia..."
-            autoFocus
-          />
-          <div className="grid grid-cols-2 gap-4">
-            <Input
-              label="Longitud"
-              value={formData.length}
-              onChange={e => setFormData({ ...formData, length: e.target.value })}
-              placeholder="Ej. 1200"
-            />
-            <Input
-              label="Cantidad"
-              type="text"
-              inputMode="text"
-              value={formData.quantity}
-              onChange={e => setFormData({ ...formData, quantity: e.target.value })}
-              placeholder="Ej. 50"
-            />
-          </div>
-        </div>
-
-        {/* Action Bar */}
-        <div className="fixed bottom-[70px] left-0 right-0 p-4 bg-slate-900/90 backdrop-blur border-t border-slate-800 flex gap-3">
-          <Button variant="secondary" className="flex-1" onClick={() => setStatus('idle')}>
-            <X className="mr-2" size={18} /> Cancelar
-          </Button>
-          <Button
-            className="flex-[2]"
-            onClick={handleSave}
-            variant={isDuplicate ? 'secondary' : 'primary'}
-            disabled={isSaving || isDuplicate || !formData.reference}
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="mr-2 animate-spin" size={18} /> Guardando...
-              </>
-            ) : (
-              <>
-                <Save className="mr-2" size={18} /> Guardar
-              </>
-            )}
-          </Button>
-        </div>
       </div>
     );
   }
 
   return (
     <div className="flex flex-col items-center justify-center h-full p-6 text-center">
-      <div className="mb-8">
-        <img
-          src="/icon.png"
-          alt="Delfin Suite"
-          className="w-32 h-32 object-contain drop-shadow-2xl animate-float"
-        />
+      <div className="mb-8 bg-slate-800 p-6 rounded-full shadow-2xl shadow-black/50 border border-slate-700">
+        <Camera size={64} className="text-slate-500" />
       </div>
 
       <h1 className="text-3xl font-bold text-white mb-2">Escanear Etiqueta</h1>
@@ -508,13 +417,6 @@ export const Scanner: React.FC = () => {
         onChange={handleFileSelect}
         onClick={(e) => (e.currentTarget.value = '')}
       />
-
-      <button
-        onClick={handleManualEntry}
-        className="mb-6 w-full max-w-xs bg-slate-800 text-slate-300 py-3 rounded-lg border border-slate-700 hover:bg-slate-700 hover:border-slate-600 transition-all font-medium flex items-center justify-center gap-2"
-      >
-        <Edit3 size={18} /> Entrada Manual
-      </button>
 
       <Button
         onClick={() => setStatus('camera')}
