@@ -146,7 +146,7 @@ export const ReferenceLibraryManager: React.FC = () => {
 
     const handleCloudUpload = async () => {
         console.log("☁️ handleCloudUpload clicked");
-        if (!confirm("Esto subirá tu catálogo actual a la nube, sobrescribiendo el backup anterior. ¿Continuar?")) return;
+        // if (!confirm("Esto subirá tu catálogo actual a la nube, sobrescribiendo el backup anterior. ¿Continuar?")) return;
         setUploadStatus("Generando y subiendo backup...");
         try {
             console.log("Starting upload process...");
