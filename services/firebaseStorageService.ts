@@ -1,5 +1,6 @@
+```typescript
 import { db, auth, storage, ensureSignedIn } from '../src/config/firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject, listAll, getBytes } from 'firebase/storage';
 import {
     collection,
     addDoc,
@@ -161,7 +162,7 @@ export const uploadBackup = async (content: string, filename: string): Promise<s
         await ensureSignedIn();
 
         const blob = new Blob([content], { type: 'application/json' });
-        const storageRef = ref(storage, `backups/${filename}`);
+        const storageRef = ref(storage, `backups / ${ filename } `);
         await uploadBytes(storageRef, blob);
         const url = await getDownloadURL(storageRef);
         return url;
@@ -171,14 +172,21 @@ export const uploadBackup = async (content: string, filename: string): Promise<s
     }
 };
 
-export const getBackupUrl = async (filename: string): Promise<string> => {
+export const downloadBackupJSON = async (filename: string): Promise<any> => {
     try {
         await ensureSignedIn();
-        const storageRef = ref(storage, `backups/${filename}`);
-        const url = await getDownloadURL(storageRef);
-        return url;
+        const storageRef = ref(storage, `backups / ${ filename } `);
+        console.log(`Attempting to download via SDK: backups / ${ filename } `);
+        
+        // Download directly into memory (max ~100MB usually fine for this app, 
+        // if larger we might need another approach or CORS config for fetch)
+        const arrayBuffer = await getBytes(storageRef);
+        
+        const decoder = new TextDecoder();
+        const jsonString = decoder.decode(arrayBuffer);
+        return JSON.parse(jsonString);
     } catch (error) {
-        console.error("Error getting backup URL:", error);
+        console.error("Error downloading backup JSON:", error);
         throw error;
     }
 };

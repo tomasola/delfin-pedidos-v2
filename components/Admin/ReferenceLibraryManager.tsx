@@ -10,7 +10,7 @@ import {
     importFromFolder,
     importReferenceImages,
 } from '../../services/referenceLibraryService';
-import { uploadBackup, getBackupUrl } from '../../services/firebaseStorageService';
+import { uploadBackup, downloadBackupJSON } from '../../services/firebaseStorageService';
 
 export const ReferenceLibraryManager: React.FC = () => {
     const [references, setReferences] = useState<ReferenceImage[]>([]);
@@ -169,11 +169,9 @@ export const ReferenceLibraryManager: React.FC = () => {
         if (!confirm("Esto descargará el backup de la nube e IMPORTARÁ las referencias. Puede tardar unos minutos. ¿Continuar?")) return;
         setUploadStatus("Descargando backup de la nube...");
         try {
-            console.log("Getting backup URL...");
-            const url = await getBackupUrl('reference_library.json');
-            console.log("URL obtained:", url);
-            const response = await fetch(url);
-            const json = await response.json();
+            console.log("Getting backup JSON directly...");
+            const json = await downloadBackupJSON('reference_library.json');
+            console.log("JSON obtained");
 
             setUploadStatus("Importando referencias...");
             // @ts-ignore
