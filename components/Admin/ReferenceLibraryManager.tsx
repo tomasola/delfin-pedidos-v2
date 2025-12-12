@@ -180,10 +180,11 @@ export const ReferenceLibraryManager: React.FC = () => {
             setUploadStatus("Restauración completada. Correctos: " + result.success);
             alert("Restauración completada.\nCorrectos: " + result.success + "\nErrores: " + result.errors);
             loadReferences();
-        } catch (error) {
+        } catch (error: any) {
             console.error("Download failed:", error);
             setUploadStatus("Error al descargar/importar backup.");
-            alert("Error al descargar o importar el backup. Asegúrate de que existe un backup en la nube.");
+            // Show detailed error in alert to help debugging on mobile
+            alert("Error: " + (error.message || error) + "\n\nAsegúrate de haber SUBIDO el backup primero desde el PC.");
         }
     };
     const handleDelete = async (id: string) => {
