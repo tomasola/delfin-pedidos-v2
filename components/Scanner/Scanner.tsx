@@ -10,6 +10,7 @@ import { generatePDF } from '../../services/pdfService';
 import { CropEditor } from './CropEditor';
 import { BoundingBox } from '../../types';
 import { DocumentTypeWarning } from '../ui/DocumentTypeWarning';
+import { getReferenceImage } from '../../services/referenceLibraryService';
 
 export const Scanner: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -23,6 +24,42 @@ export const Scanner: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [detectedDocType, setDetectedDocType] = useState<'LABEL' | 'ORDER' | 'UNKNOWN' | null>(null);
   const [showDocTypeWarning, setShowDocTypeWarning] = useState(false);
+  const [referenceImage, setReferenceImage] = useState<string>('');
+  const [loadingRefImage, setLoadingRefImage] = useState(false);
+
+  // Efecto para buscar imagen de referencia cuando cambia la referencia en modo manual
+  useEffect(() => {
+    if (status === 'manual' && formData.reference) {
+      const searchReference = async () => {
+        setLoadingRefImage(true);
+        try {
+          const refImg = await getReferenceImage(formData.reference);
+          if (refImg) {
+            setReferenceImage(refImg.imageData);
+            setCroppedImage(refImg.imageData);
+            setOriginalImage(refImg.imageData);
+          } else {
+            setReferenceImage('');
+            setCroppedImage('');
+            setOriginalImage('');
+          }
+        } catch (error) {
+          console.error('Error buscando imagen de referencia:', error);
+          setReferenceImage('');
+        } finally {
+          setLoadingRefImage(false);
+        }
+      };
+
+      // Debounce para evitar muchas búsquedas
+      const timer = setTimeout(searchReference, 500);
+      return () => clearTimeout(timer);
+    } else if (status === 'manual' && !formData.reference) {
+      setReferenceImage('');
+      setCroppedImage('');
+      setOriginalImage('');
+    }
+  }, [formData.reference, status]);
 
   // Efecto para verificar duplicados en tiempo real cuando cambia la referencia o entramos en modo revisión
   useEffect(() => {
@@ -414,12 +451,41 @@ export const Scanner: React.FC = () => {
       <div className="flex flex-col h-full overflow-y-auto p-4 pb-24">
         <h2 className="text-xl font-bold text-white mb-4">Entrada Manual</h2>
 
-        <div className="bg-slate-800 rounded-xl p-6 mb-6 shadow-lg border border-slate-700 text-center">
-          <p className="text-slate-400 text-sm mb-2">Modo sin imagen</p>
-          <div className="w-20 h-20 bg-slate-700 rounded-full mx-auto flex items-center justify-center text-slate-500">
-            <Edit3 size={32} />
+        {/* Reference Image Card - shown when reference image is found */}
+        {referenceImage ? (
+          <div className="bg-slate-800 rounded-xl p-4 mb-6 shadow-lg border border-slate-700">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Imagen de Referencia</h3>
+              <span className="text-xs text-green-400 flex items-center gap-1">
+                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                Encontrada
+              </span>
+            </div>
+            <div className="bg-white rounded-lg p-2 flex justify-center min-h-[150px]">
+              <img src={referenceImage} alt="Referencia" className="max-h-48 object-contain" />
+            </div>
           </div>
-        </div>
+        ) : loadingRefImage ? (
+          <div className="bg-slate-800 rounded-xl p-6 mb-6 shadow-lg border border-slate-700 text-center">
+            <Loader2 className="animate-spin text-amber-500 mx-auto mb-2" size={32} />
+            <p className="text-slate-400 text-sm">Buscando imagen de referencia...</p>
+          </div>
+        ) : formData.reference ? (
+          <div className="bg-slate-800 rounded-xl p-6 mb-6 shadow-lg border border-slate-700 text-center">
+            <p className="text-slate-400 text-sm mb-2">Sin imagen de referencia</p>
+            <div className="w-20 h-20 bg-slate-700 rounded-full mx-auto flex items-center justify-center text-slate-500">
+              <Edit3 size={32} />
+            </div>
+            <p className="text-xs text-slate-500 mt-2">Introduce la referencia para buscar la imagen</p>
+          </div>
+        ) : (
+          <div className="bg-slate-800 rounded-xl p-6 mb-6 shadow-lg border border-slate-700 text-center">
+            <p className="text-slate-400 text-sm mb-2">Modo sin imagen</p>
+            <div className="w-20 h-20 bg-slate-700 rounded-full mx-auto flex items-center justify-center text-slate-500">
+              <Edit3 size={32} />
+            </div>
+          </div>
+        )}
 
         {/* Data Form */}
         <div className="space-y-4">

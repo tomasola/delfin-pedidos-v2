@@ -153,3 +153,32 @@ export const uploadImage = async (base64String: string, path: string): Promise<s
         throw error;
     }
 };
+
+// ============ BACKUPS ============
+
+export const uploadBackup = async (content: string, filename: string): Promise<string> => {
+    try {
+        await ensureSignedIn();
+
+        const blob = new Blob([content], { type: 'application/json' });
+        const storageRef = ref(storage, `backups/${filename}`);
+        await uploadBytes(storageRef, blob);
+        const url = await getDownloadURL(storageRef);
+        return url;
+    } catch (error) {
+        console.error("Error uploading backup:", error);
+        throw error;
+    }
+};
+
+export const getBackupUrl = async (filename: string): Promise<string> => {
+    try {
+        await ensureSignedIn();
+        const storageRef = ref(storage, `backups/${filename}`);
+        const url = await getDownloadURL(storageRef);
+        return url;
+    } catch (error) {
+        console.error("Error getting backup URL:", error);
+        throw error;
+    }
+};

@@ -3,20 +3,21 @@ import Webcam from 'react-webcam';
 import { X, Camera, Upload, Search, CheckCircle, AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { compressImage } from '../../utils/imageCompression';
-import { getRecords } from '../../services/localStorageService';
-import { identifyProduct, testModelAvailability, identifyProductWithFallback } from '../../services/geminiService';
-
-
-import { Record } from '../../types';
+import { getAllReferenceImages } from '../../services/referenceLibraryService';
+import { testModelAvailability, identifyProductWithFallback } from '../../services/geminiService';
 
 interface VisualSearchModalProps {
     isOpen: boolean;
     onClose: () => void;
     onMatchFound: (reference: string) => void;
+    onImageSelected?: (imageData: string) => void;
 }
 
-export const VisualSearchModal: React.FC<VisualSearchModalProps> = ({ isOpen, onClose, onMatchFound }) => {
-    const [step, setStep] = useState<'camera' | 'preview' | 'searching' | 'result'>('camera');
+export const VisualSearchModal: React.FC<VisualSearchModalProps> = ({ isOpen, onClose, onMatchFound, onImageSelected }) => {
+    const [step, setStep] = useState<'mode-select' | 'camera' | 'preview' | 'searching' | 'result'>('mode-select');
+    const [searchText, setSearchText] = useState('');
+    const [searchResults, setSearchResults] = useState<{ reference: string, imageData: string }[]>([]);
+    const [isSearchingText, setIsSearchingText] = useState(false);
     const [image, setImage] = useState<string>('');
     const [matchResult, setMatchResult] = useState<string | null>(null);
     const [candidatesCount, setCandidatesCount] = useState(0);
@@ -70,29 +71,44 @@ export const VisualSearchModal: React.FC<VisualSearchModalProps> = ({ isOpen, on
         }
     };
 
+    const handleTextSearch = async (term: string) => {
+        setSearchText(term);
+        if (term.length < 2) {
+            setSearchResults([]);
+            return;
+        }
+
+        setIsSearchingText(true);
+        try {
+            const allRefs = await getAllReferenceImages();
+            // Simple client-side filter
+            const matches = allRefs.filter(r =>
+                r.reference.toLowerCase().includes(term.toLowerCase())
+            ).map(r => ({ reference: r.reference, imageData: r.imageData }));
+
+            setSearchResults(matches);
+        } catch (error) {
+            console.error("Text search error", error);
+        } finally {
+            setIsSearchingText(false);
+        }
+    };
+
     const handleSearch = async () => {
         setStep('searching');
         setConnectionStatus(''); // Clear status
         try {
-            // 1. Get local records
-            const allRecords = await getRecords();
-            // ... (rest of logic)
+            // 1. Get Reference Library images (Source of truth)
+            const allReferences = await getAllReferenceImages();
 
-            // 2. Filter unique references (most recent one per ref)
-            const uniqueRecordsMap = new Map<string, Record>();
-            allRecords.forEach(r => {
-                if (r.reference && !uniqueRecordsMap.has(r.reference)) {
-                    // Verify it has an image (either original or cropped)
-                    if (r.croppedImage || r.originalImage) {
-                        uniqueRecordsMap.set(r.reference, r);
-                    }
-                }
-            });
+            // 2. Sort by newest first (to match "últimas añadidas" request)
+            const sortedReferences = allReferences.sort((a, b) => b.uploadedAt - a.uploadedAt);
 
-            // Limit to X most recent candidates to save tokens/latency
-            const candidates = Array.from(uniqueRecordsMap.values()).slice(0, 15).map(r => ({
+            // 3. Limit to X most recent candidates to avoid token limits/latency
+            // Using top 20 for now.
+            const candidates = sortedReferences.slice(0, 20).map(r => ({
                 reference: r.reference,
-                image: r.originalImage || r.croppedImage // PRIORITIZE ORIGINAL IMAGE (Full Label)
+                image: r.imageData
             }));
 
             setCandidatesCount(candidates.length);
@@ -135,7 +151,7 @@ export const VisualSearchModal: React.FC<VisualSearchModalProps> = ({ isOpen, on
                 <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50 backdrop-blur">
                     <h3 className="text-lg font-bold text-white flex items-center gap-2">
                         <Search className="text-amber-500" size={20} />
-                        Búsqueda Visual (Beta)
+                        Buscador de Referencias
                     </h3>
                     <button onClick={onClose} className="text-slate-400 hover:text-white">
                         <X size={24} />
@@ -143,7 +159,61 @@ export const VisualSearchModal: React.FC<VisualSearchModalProps> = ({ isOpen, on
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto p-4 flex flex-col items-center justify-center min-h-[300px]">
+                <div className="flex-1 overflow-y-auto p-4 flex flex-col min-h-[400px]">
+
+                    {step === 'mode-select' && (
+                        <div className="w-full flex-1 flex flex-col gap-6">
+                            {/* Text Search Section */}
+                            <div className="w-full">
+                                <label className="text-sm font-medium text-slate-400 mb-2 block">Buscar por Referencia o Nombre</label>
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500" size={18} />
+                                    <input
+                                        type="text"
+                                        className="w-full bg-slate-800 border border-slate-700 rounded-lg py-3 pl-10 pr-4 text-white focus:ring-2 focus:ring-amber-500 outline-none"
+                                        placeholder="Ej: 10008, 9200..."
+                                        value={searchText}
+                                        onChange={(e) => handleTextSearch(e.target.value)}
+                                        autoFocus
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Search Results Grid */}
+                            {searchText.length > 0 && (
+                                <div className="flex-1 min-h-[200px] bg-slate-800/30 rounded-lg p-2 overflow-y-auto">
+                                    {isSearchingText ? (
+                                        <div className="text-center pt-8 text-slate-500">Buscando...</div>
+                                    ) : searchResults.length === 0 ? (
+                                        <div className="text-center pt-8 text-slate-500">No se encontraron referencias</div>
+                                    ) : (
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                            {searchResults.map((res) => (
+                                                <div
+                                                    key={res.reference}
+                                                    onClick={() => onMatchFound(res.reference)}
+                                                    className="bg-slate-800 border border-slate-700 rounded-lg p-2 cursor-pointer hover:ring-2 hover:ring-amber-500 transition-all flex flex-col items-center"
+                                                >
+                                                    <div className="w-full aspect-square bg-white rounded overflow-hidden mb-2 items-center justify-center flex">
+                                                        <img src={res.imageData} alt={res.reference} className="max-w-full max-h-full object-contain" />
+                                                    </div>
+                                                    <p className="text-white font-bold text-sm truncate w-full text-center">{res.reference}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Visual Search Option */}
+                            <div className="mt-auto pt-6 border-t border-slate-800">
+                                <p className="text-center text-slate-500 text-sm mb-4">¿No sabes la referencia?</p>
+                                <Button onClick={() => setStep('camera')} variant="primary" fullWidth className="py-4 bg-indigo-600 hover:bg-indigo-700">
+                                    <Camera className="mr-2" size={20} /> Usar Búsqueda Visual (Cámara)
+                                </Button>
+                            </div>
+                        </div>
+                    )}
 
                     {step === 'camera' && (
                         <div className="w-full h-full flex flex-col items-center">
@@ -165,6 +235,9 @@ export const VisualSearchModal: React.FC<VisualSearchModalProps> = ({ isOpen, on
                                     <Camera className="mr-2" size={18} /> Capturar
                                 </Button>
                             </div>
+                            <Button onClick={() => setStep('mode-select')} variant="secondary" fullWidth className="mt-4">
+                                <X className="mr-2" size={18} /> Cancelar Cámara
+                            </Button>
                             <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileSelect} />
                         </div>
                     )}
@@ -183,6 +256,20 @@ export const VisualSearchModal: React.FC<VisualSearchModalProps> = ({ isOpen, on
                                     <Search className="mr-2" size={18} /> Buscar
                                 </Button>
                             </div>
+
+                            {onImageSelected && (
+                                <div className="w-full mt-4 pt-4 border-t border-slate-800">
+                                    <Button
+                                        onClick={() => onImageSelected(image)}
+                                        variant="secondary"
+                                        fullWidth
+                                        className="bg-indigo-900/50 hover:bg-indigo-900 text-indigo-200 border-indigo-500/30"
+                                    >
+                                        <CheckCircle className="mr-2" size={18} /> Usar esta imagen para etiqueta
+                                    </Button>
+                                    <p className="text-xs text-slate-500 text-center mt-2">Crea una etiqueta nueva con esta foto sin buscar referencia.</p>
+                                </div>
+                            )}
                         </div>
                     )}
 

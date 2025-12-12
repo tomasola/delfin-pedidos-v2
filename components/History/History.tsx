@@ -2,7 +2,8 @@
 
 
 import React, { useState, useEffect, useRef } from 'react';
-import { getRecords, deleteRecord, updateRecord } from '../../services/localStorageService';
+import { getRecords, deleteRecord, updateRecord, saveRecord } from '../../services/localStorageService';
+import { getAllReferenceImages } from '../../services/referenceLibraryService';
 import { Record as ScanRecord } from '../../types';
 import { Search, Trash2, Pencil, Check, Package, Camera, X } from 'lucide-react';
 import { Modal } from '../ui/Modal';
@@ -13,6 +14,8 @@ import { VisualSearchModal } from './VisualSearchModal';
 export const History: React.FC = () => {
   const [records, setRecords] = useState<ScanRecord[]>([]);
   const [search, setSearch] = useState('');
+  const [libraryMatches, setLibraryMatches] = useState<ScanRecord[]>([]);
+  const [uploadedMatches, setUploadedMatches] = useState<ScanRecord[]>([]);
 
   // State for Delete
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -42,10 +45,62 @@ export const History: React.FC = () => {
     getRecords().then(setRecords);
   }, []);
 
-  const filteredRecords = records.filter(r =>
-    r.reference.toLowerCase().includes(search.toLowerCase()) ||
-    r.length.includes(search)
-  );
+  // Effect for searching Reference Library
+  useEffect(() => {
+    const searchLibrary = async () => {
+      if (!search || search.length < 3) {
+        setLibraryMatches([]);
+        return;
+      }
+
+      const allRefs = await getAllReferenceImages();
+      const matches = allRefs.filter(r =>
+        r.reference.toLowerCase().includes(search.toLowerCase())
+      );
+
+      // Convert matches to ScanRecord format (Virtual Records)
+      const virtualRecords: ScanRecord[] = matches.map(m => ({
+        id: `lib_${m.id}`,
+        reference: m.reference,
+        length: 'CATÁLOGO', // Indicator
+        quantity: '-',
+        originalImage: m.imageData,
+        croppedImage: m.imageData,
+        timestamp: m.uploadedAt,
+        notes: 'Referencia de Catálogo Original'
+      }));
+
+      setLibraryMatches(virtualRecords);
+    };
+
+    const timeoutId = setTimeout(searchLibrary, 300); // Debounce
+    return () => clearTimeout(timeoutId);
+  }, [search]);
+
+  const handleImageSelected = (imageData: string) => {
+    const tempId = `temp_${Date.now()}`;
+    const newRecord: ScanRecord = {
+      id: tempId,
+      reference: 'NUEVA',
+      length: 'CUSTOM', // Indicator
+      quantity: '-',
+      originalImage: imageData,
+      croppedImage: imageData,
+      timestamp: Date.now(),
+      notes: 'Imagen subida manualmente'
+    };
+    setUploadedMatches(prev => [newRecord, ...prev]);
+    setShowVisualSearch(false);
+  };
+
+  const filteredRecords = [
+    ...uploadedMatches,
+    ...libraryMatches,
+    ...records.filter(r =>
+      r.reference.toLowerCase().includes(search.toLowerCase()) ||
+      r.length.includes(search)
+    )
+  ];
 
   // Delete Handlers
   const handleDeleteRequest = (id: string) => {
@@ -88,18 +143,39 @@ export const History: React.FC = () => {
 
   const saveEditedData = async () => {
     if (editRecordData) {
-      const updatedRecord = {
-        ...editRecordData,
-        reference: editFormData.reference,
-        length: editFormData.length,
-        quantity: editFormData.quantity
-      };
+      if (editRecordData.id.startsWith('lib_') || editRecordData.id.startsWith('temp_')) {
+        // Converting library reference or temp upload to real record
+        const newRecord = {
+          reference: editFormData.reference,
+          length: editFormData.length,
+          quantity: editFormData.quantity,
+          originalImage: editRecordData.originalImage,
+          croppedImage: editRecordData.croppedImage,
+          timestamp: Date.now(),
+          notes: editRecordData.notes
+        };
+        await saveRecord(newRecord);
 
-      await updateRecord(updatedRecord);
+        // If it was a temp record, remove it from the temp list
+        if (editRecordData.id.startsWith('temp_')) {
+          setUploadedMatches(prev => prev.filter(r => r.id !== editRecordData.id));
+        }
+      } else {
+        // Updating existing record
+        const updatedRecord = {
+          ...editRecordData,
+          reference: editFormData.reference,
+          length: editFormData.length,
+          quantity: editFormData.quantity
+        };
+        await updateRecord(updatedRecord);
+      }
+
       const records = await getRecords();
       setRecords(records);
       setShowEditFormModal(false);
       setEditRecordData(null);
+      setSearch(''); // Clear search to show the new record
     }
   };
 
@@ -165,74 +241,112 @@ export const History: React.FC = () => {
         </div>
         <button
           onClick={() => setShowVisualSearch(true)}
-          className="bg-amber-600 hover:bg-amber-700 text-white p-3 rounded-lg flex items-center justify-center transition-colors shadow-lg shadow-amber-900/20 active:scale-95"
-          title="Búsqueda Visual por Foto"
+          className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-lg shadow-indigo-900/20 active:scale-95 font-medium whitespace-nowrap"
+          title="Buscar en Catálogo de Referencias"
         >
-          <Camera size={20} />
+          <Search size={18} />
+          <span className="hidden sm:inline">Buscar Referencia</span>
         </button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 pb-24 space-y-3">
         {filteredRecords.length === 0 ? (
           <div className="text-center text-slate-500 mt-10">
-            <p>No hay registros.</p>
+            <p>No hay registros ni coincidencias en catálogo.</p>
           </div>
         ) : (
-          filteredRecords.map(record => (
-            <div key={record.id} className="bg-slate-800 rounded-lg p-3 flex items-center gap-3 border border-slate-700/50 shadow-sm">
-              <div
-                onClick={() => {
+          filteredRecords.map(record => {
+            const isLibraryRecord = record.id.startsWith('lib_');
+            return (
+              <div key={record.id} className={`rounded-lg p-3 flex items-center gap-3 border shadow-sm ${isLibraryRecord ? 'bg-indigo-900/40 border-indigo-500/50' : 'bg-slate-800 border-slate-700/50'}`}>
+                <div
+                  onClick={() => {
+                    setSelectedRecord(record);
+                    setShowPackingDetails(false);
+                    setShowOriginalImage(isLibraryRecord);
+                  }}
+                  className={`w-16 h-16 rounded overflow-hidden flex-shrink-0 flex items-center justify-center relative cursor-pointer hover:ring-2 transition-all ${isLibraryRecord ? 'bg-indigo-950 hover:ring-indigo-400' : 'bg-white hover:ring-amber-500'}`}
+                >
+                  {record.croppedImage ? (
+                    <img src={record.croppedImage} alt="crop" className="w-full h-full object-contain" />
+                  ) : (
+                    <span className="text-xs text-slate-300">No img</span>
+                  )}
+                  {/* Indicator if packing info exists */}
+                  {(record.boxSize || record.packingPhoto) && (
+                    <div className="absolute top-0 right-0 w-3 h-3 bg-amber-500 rounded-bl-md"></div>
+                  )}
+                  {isLibraryRecord && (
+                    <div className="absolute bottom-0 w-full bg-indigo-600 text-[8px] text-white text-center">CATÁLOGO</div>
+                  )}
+                </div>
+
+                <div className="flex-1 min-w-0" onClick={() => {
                   setSelectedRecord(record);
                   setShowPackingDetails(false);
-                  setShowOriginalImage(false);
-                }}
-                className="w-16 h-16 bg-white rounded overflow-hidden flex-shrink-0 flex items-center justify-center relative cursor-pointer hover:ring-2 hover:ring-amber-500 transition-all"
-              >
-                {record.croppedImage ? (
-                  <img src={record.croppedImage} alt="crop" className="w-full h-full object-contain" />
-                ) : (
-                  <span className="text-xs text-slate-300">No img</span>
-                )}
-                {/* Indicator if packing info exists */}
-                {(record.boxSize || record.packingPhoto) && (
-                  <div className="absolute top-0 right-0 w-3 h-3 bg-amber-500 rounded-bl-md"></div>
-                )}
-              </div>
+                  setShowOriginalImage(isLibraryRecord);
+                }}>
+                  <h3 className={`font-bold truncate ${isLibraryRecord ? 'text-indigo-200' : 'text-white'}`}>{record.reference}</h3>
+                  <p className="text-slate-400 text-xs">
+                    {isLibraryRecord ?
+                      <span className="text-indigo-400 font-semibold">IMAGEN DE REFERENCIA OFICIAL</span> :
+                      record.id.startsWith('temp_') ?
+                        <span className="text-amber-400 font-semibold">NUEVA IMAGEN SIN GUARDAR</span> :
+                        `L: ${record.length} • Qty: ${record.quantity}`
+                    }
+                  </p>
+                  {record.boxSize && <p className="text-amber-500 text-[10px] mt-1">Caja: {record.boxSize}</p>}
+                  {!isLibraryRecord && <p className="text-slate-600 text-[10px] mt-0.5">{new Date(record.timestamp).toLocaleDateString()}</p>}
+                </div>
 
-              <div className="flex-1 min-w-0" onClick={() => {
-                setSelectedRecord(record);
-                setShowPackingDetails(false);
-                setShowOriginalImage(false);
-              }}>
-                <h3 className="text-white font-bold truncate">{record.reference}</h3>
-                <p className="text-slate-400 text-xs">L: {record.length} • Qty: {record.quantity}</p>
-                {record.boxSize && <p className="text-amber-500 text-[10px] mt-1">Caja: {record.boxSize}</p>}
-                <p className="text-slate-600 text-[10px] mt-0.5">{new Date(record.timestamp).toLocaleDateString()}</p>
-              </div>
+                <div className="flex flex-col gap-2">
+                  {!isLibraryRecord && !record.id.startsWith('temp_') ? (
+                    <>
+                      <button
+                        onClick={() => handlePackingRequest(record)}
+                        className={`p-2 rounded hover:bg-slate-600 ${record.boxSize ? 'bg-amber-900/30 text-amber-500 border border-amber-500/30' : 'bg-slate-700 text-slate-300'}`}
+                        title="Empaque y Fotos"
+                      >
+                        <Package size={18} />
+                      </button>
+                      <button
+                        onClick={() => handleEditRequest(record)}
+                        className="p-2 bg-slate-700 text-blue-400 rounded hover:bg-slate-600"
+                      >
+                        <Pencil size={18} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteRequest(record.id)}
+                        className="p-2 bg-slate-700 text-red-400 rounded hover:bg-slate-600"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {/* Allow DELETE for temp records */}
+                      {record.id.startsWith('temp_') && (
+                        <button
+                          onClick={() => setUploadedMatches(prev => prev.filter(r => r.id !== record.id))}
+                          className="p-2 bg-slate-700 text-red-400 rounded hover:bg-slate-600"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      )}
 
-              <div className="flex flex-col gap-2">
-                <button
-                  onClick={() => handlePackingRequest(record)}
-                  className={`p-2 rounded hover:bg-slate-600 ${record.boxSize ? 'bg-amber-900/30 text-amber-500 border border-amber-500/30' : 'bg-slate-700 text-slate-300'}`}
-                  title="Empaque y Fotos"
-                >
-                  <Package size={18} />
-                </button>
-                <button
-                  onClick={() => handleEditRequest(record)}
-                  className="p-2 bg-slate-700 text-blue-400 rounded hover:bg-slate-600"
-                >
-                  <Pencil size={18} />
-                </button>
-                <button
-                  onClick={() => handleDeleteRequest(record.id)}
-                  className="p-2 bg-slate-700 text-red-400 rounded hover:bg-slate-600"
-                >
-                  <Trash2 size={18} />
-                </button>
+                      <button
+                        onClick={() => handleEditRequest(record)}
+                        className="p-2 bg-slate-700 text-blue-400 rounded hover:bg-slate-600 animate-pulse"
+                        title="Completar datos para guardar"
+                      >
+                        <Pencil size={18} />
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
@@ -240,6 +354,7 @@ export const History: React.FC = () => {
       <VisualSearchModal
         isOpen={showVisualSearch}
         onClose={() => setShowVisualSearch(false)}
+        onImageSelected={handleImageSelected}
         onMatchFound={(reference) => {
           setSearch(reference);
           setShowVisualSearch(false);
@@ -447,12 +562,20 @@ export const History: React.FC = () => {
 
                 <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
                   <label className="text-xs text-slate-400 uppercase font-bold tracking-wider">Longitud</label>
-                  <div className="text-2xl font-bold text-white">{selectedRecord.length}</div>
+                  {selectedRecord.id.startsWith('lib_') ? (
+                    <div className="text-lg font-bold text-indigo-400">CATÁLOGO</div>
+                  ) : (
+                    <div className="text-2xl font-bold text-white">{selectedRecord.length}</div>
+                  )}
                 </div>
 
                 <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
                   <label className="text-xs text-slate-400 uppercase font-bold tracking-wider">Cantidad</label>
-                  <div className="text-2xl font-bold text-white">{selectedRecord.quantity}</div>
+                  {selectedRecord.id.startsWith('lib_') ? (
+                    <div className="text-lg font-bold text-indigo-400">-</div>
+                  ) : (
+                    <div className="text-2xl font-bold text-white">{selectedRecord.quantity}</div>
+                  )}
                 </div>
               </div>
 
@@ -498,7 +621,7 @@ export const History: React.FC = () => {
               )}
 
               <div className="text-center text-slate-500 text-sm pt-4 border-t border-slate-800">
-                Escaneado el {new Date(selectedRecord.timestamp).toLocaleString()}
+                {selectedRecord.id.startsWith('lib_') ? 'Imagen importada de Biblioteca de Referencias' : `Escaneado el ${new Date(selectedRecord.timestamp).toLocaleString()}`}
               </div>
             </div>
           </div>
